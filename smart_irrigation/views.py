@@ -1,10 +1,26 @@
-from flask import request, jsonify
+from flask import render_template, request, redirect, url_for, jsonify
 from shared.config import db
-from .models import IrrigationData
-from datetime import datetime, timedelta
+from .models import IrrigationPreset, IrrigationSchedule, IrrigationData
+from datetime import datetime, time, timedelta
 import csv
 from io import StringIO
-from . import irrigation_app, socketio  # استيراد Blueprint و socketio
+from . import irrigation_app
+from shared.socketio import socketio
+
+# عرض الصفحة الرئيسية مع قائمة الـ presets
+@irrigation_app.route('/')
+def index():
+    presets = IrrigationPreset.query.all()
+    return render_template('index.html', presets=presets)
+
+# اختيار Preset وعرض جدول الري الخاص به
+@irrigation_app.route('/irrigation/select_preset', methods=['POST'])
+def select_preset():
+    preset_id = request.form.get('preset_id')
+    if preset_id:
+        selected_preset = IrrigationPreset.query.get(preset_id)
+        return render_template('index.html', presets=IrrigationPreset.query.all(), selected_preset=selected_preset)
+    return redirect(url_for('index'))
 
 # إضافة بيانات الري
 @irrigation_app.route('/api/irrigation', methods=['POST'])
@@ -23,7 +39,7 @@ def add_irrigation_data():
         "water_level": data['water_level']
     })
 
-    return jsonify({"message": "Data added successfully"}), 201
+    return jsonify({"message": "Irrigation data added successfully"}), 201
 
 # التحكم في المضخة بناءً على نسبة الرطوبة
 @irrigation_app.route('/api/irrigation/control', methods=['POST'])
@@ -98,7 +114,6 @@ def manual_pump_control():
 # إنشاء تقارير CSV
 @irrigation_app.route('/api/irrigation/report', methods=['GET'])
 def generate_irrigation_report():
-    # الحصول على نطاق التاريخ من الطلب
     start_date_str = request.args.get('start_date')
     end_date_str = request.args.get('end_date')
     download = request.args.get('download', 'false').lower() == 'true'
@@ -125,7 +140,7 @@ def generate_irrigation_report():
             writer = csv.writer(output)
 
             # كتابة رأس الملف
-            writer.writerow(["Timestamp", "Pump Status", "Water Level", "Pump Duration (seconds)"])
+            writer.writerow(["Timestamp", "Pump Status", "Water Level (%)", "Pump Duration (seconds)"])
 
             # كتابة البيانات
             for entry in data:
@@ -154,3 +169,75 @@ def generate_irrigation_report():
             return jsonify(report), 200
     else:
         return jsonify({"message": "No data available"}), 404
+
+# إضافة جدول ري جديد
+@irrigation_app.route('/api/irrigation/schedule', methods=['POST'])
+def add_schedule():
+    data = request.json
+    start_time = datetime.strptime(data['start_time'], '%H:%M').time()  # تحويل النص إلى وقت
+    duration = float(data['duration'])  # مدة التشغيل (بالثواني)
+
+    new_schedule = IrrigationSchedule(
+        start_time=start_time,
+        duration=duration,
+        active=True
+    )
+    db.session.add(new_schedule)
+    db.session.commit()
+
+    return jsonify({"message": "Schedule added successfully"}), 201
+
+# إضافة preset جديد
+@irrigation_app.route('/api/irrigation/preset', methods=['POST'])
+def add_preset():
+    data = request.json
+    name = data['name']
+    schedules = data.get('schedules', [])  # قائمة بجداول الري
+
+    new_preset = IrrigationPreset(name=name)
+    db.session.add(new_preset)
+
+    for schedule in schedules:
+        start_time = datetime.strptime(schedule['start_time'], '%H:%M').time()
+        duration = float(schedule['duration'])
+        new_schedule = IrrigationSchedule(
+            start_time=start_time,
+            duration=duration,
+            active=True,
+            preset=new_preset
+        )
+        db.session.add(new_schedule)
+
+    db.session.commit()
+    return jsonify({"message": "Preset added successfully"}), 201
+
+# جلب جميع الـ presets
+@irrigation_app.route('/api/irrigation/presets', methods=['GET'])
+def get_presets():
+    presets = IrrigationPreset.query.all()
+    presets_list = []
+    for preset in presets:
+        presets_list.append({
+            "id": preset.id,
+            "name": preset.name
+        })
+    return jsonify(presets_list), 200
+
+# جلب الـ preset المحدد
+@irrigation_app.route('/api/irrigation/preset/<int:preset_id>', methods=['GET'])
+def get_preset(preset_id):
+    preset = IrrigationPreset.query.get(preset_id)
+    if not preset:
+        return jsonify({"message": "Preset not found"}), 404
+
+    schedules = []
+    for schedule in preset.schedules:
+        schedules.append({
+            "start_time": schedule.start_time.strftime('%H:%M'),
+            "duration": schedule.duration
+        })
+
+    return jsonify({
+        "name": preset.name,
+        "schedules": schedules
+    }), 200

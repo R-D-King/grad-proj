@@ -1,9 +1,8 @@
 from flask_sqlalchemy import SQLAlchemy
+from flask import Flask
 
-# تعريف db
-db = SQLAlchemy()
+db = SQLAlchemy()  # إنشاء كائن SQLAlchemy
 
-# إعدادات التطبيق
 class Config:
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///app.db'  # مسار قاعدة البيانات
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///app.db'  # قاعدة بيانات SQLite
     SQLALCHEMY_TRACK_MODIFICATIONS = False

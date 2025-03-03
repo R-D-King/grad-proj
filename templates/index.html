@@ -18,7 +18,38 @@
 <body>
     <div class="container mt-5">
         <h1 class="text-center mb-4">Smart Agriculture System</h1>
-        
+
+        <!-- قسم الساعة الحقيقية -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Real-Time Clock</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Current Time: <span id="current-time">--:--:--</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- قائمة التبديل بين الـ presets -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Select Plant Preset</h5>
+                    </div>
+                    <div class="card-body">
+                        <select id="preset-select" class="form-select">
+                            <option value="">Select a plant preset</option>
+                            <!-- سيتم ملء الخيارات عبر JavaScript -->
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- قسم بيانات الطقس -->
         <div class="row">
             <div class="col-md-6">
@@ -67,7 +98,23 @@
             </div>
         </div>
 
-        <!-- قسم إنشاء التقارير -->
+        <!-- قسم جداول الري -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Irrigation Schedules</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush" id="schedules-list">
+                            <!-- سيتم ملء جداول الري هنا عبر JavaScript -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- قسم إنشاء تقارير الطقس -->
         <div class="row mt-4">
             <div class="col-md-12">
                 <div class="card">
@@ -75,42 +122,70 @@
                         <h5 class="card-title">Generate Weather Report</h5>
                     </div>
                     <div class="card-body">
-                        <form id="report-form">
+                        <form id="weather-report-form">
                             <div class="mb-3">
-                                <label for="days" class="form-label">Number of Days:</label>
-                                <input type="number" class="form-control" id="days" name="days" min="1" value="7">
+                                <label for="weather-start-date" class="form-label">Start Date:</label>
+                                <input type="date" class="form-control" id="weather-start-date" name="start_date" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="weather-end-date" class="form-label">End Date:</label>
+                                <input type="date" class="form-control" id="weather-end-date" name="end_date" required>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Select Data to Include:</label>
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="temperature" name="temperature" checked>
-                                    <label class="form-check-label" for="temperature">Temperature (°C)</label>
+                                    <input class="form-check-input" type="checkbox" id="weather-temperature" name="temperature" checked>
+                                    <label class="form-check-label" for="weather-temperature">Temperature (°C)</label>
                                 </div>
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="humidity" name="humidity" checked>
-                                    <label class="form-check-label" for="humidity">Humidity (%)</label>
+                                    <input class="form-check-input" type="checkbox" id="weather-humidity" name="humidity" checked>
+                                    <label class="form-check-label" for="weather-humidity">Humidity (%)</label>
                                 </div>
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="soil_moisture" name="soil_moisture" checked>
-                                    <label class="form-check-label" for="soil_moisture">Soil Moisture (%)</label>
+                                    <input class="form-check-input" type="checkbox" id="weather-soil-moisture" name="soil_moisture" checked>
+                                    <label class="form-check-label" for="weather-soil-moisture">Soil Moisture (%)</label>
                                 </div>
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="wind_speed" name="wind_speed" checked>
-                                    <label class="form-check-label" for="wind_speed">Wind Speed (km/h)</label>
+                                    <input class="form-check-input" type="checkbox" id="weather-wind-speed" name="wind_speed" checked>
+                                    <label class="form-check-label" for="weather-wind-speed">Wind Speed (km/h)</label>
                                 </div>
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="pressure" name="pressure" checked>
-                                    <label class="form-check-label" for="pressure">Pressure (hPa)</label>
+                                    <input class="form-check-input" type="checkbox" id="weather-pressure" name="pressure" checked>
+                                    <label class="form-check-label" for="weather-pressure">Pressure (hPa)</label>
                                 </div>
                             </div>
-                            <button type="submit" class="btn btn-primary">Generate Report</button>
+                            <button type="submit" class="btn btn-primary">Generate Weather Report</button>
                         </form>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- قسم عرض التقرير -->
+        <!-- قسم إنشاء تقارير الري الذكي -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Generate Irrigation Report</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="irrigation-report-form">
+                            <div class="mb-3">
+                                <label for="irrigation-start-date" class="form-label">Start Date:</label>
+                                <input type="date" class="form-control" id="irrigation-start-date" name="start_date" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="irrigation-end-date" class="form-label">End Date:</label>
+                                <input type="date" class="form-control" id="irrigation-end-date" name="end_date" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Generate Irrigation Report</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- قسم عرض تقرير الطقس -->
         <div class="row mt-4">
             <div class="col-md-12">
                 <div class="card">
@@ -135,7 +210,36 @@
                         </table>
                     </div>
                     <div class="card-footer">
-                        <button class="btn btn-success" onclick="downloadReport()">Download Report (CSV)</button>
+                        <button class="btn btn-success" onclick="downloadWeatherReport()">Download Weather Report (CSV)</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- قسم عرض تقرير الري الذكي -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Irrigation Report</h5>
+                    </div>
+                    <div class="card-body data-container">
+                        <table class="table" id="irrigation-report-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Pump Status</th>
+                                    <th>Water Level (%)</th>
+                                    <th>Pump Duration (seconds)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- البيانات ستضاف هنا عبر JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="card-footer">
+                        <button class="btn btn-success" onclick="downloadIrrigationReport()">Download Irrigation Report (CSV)</button>
                     </div>
                 </div>
             </div>
@@ -145,6 +249,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script>
         var socket = io();
+
+        // تحديث الوقت الحقيقي
+        socket.on('update_time', function(data) {
+            document.getElementById('current-time').innerText = data.time;
+        });
 
         // تحديث بيانات الطقس في الوقت الفعلي
         socket.on('update_weather', function(data) {
@@ -164,17 +273,61 @@
             document.getElementById('water-level').innerText = data.water_level;
         });
 
-        // إنشاء التقرير وعرضه
-        document.getElementById('report-form').addEventListener('submit', function(event) {
-            event.preventDefault();
-            const days = document.getElementById('days').value;
-            const temperature = document.getElementById('temperature').checked;
-            const humidity = document.getElementById('humidity').checked;
-            const soil_moisture = document.getElementById('soil_moisture').checked;
-            const wind_speed = document.getElementById('wind_speed').checked;
-            const pressure = document.getElementById('pressure').checked;
+        // جلب الـ presets وتعبئة القائمة
+        function loadPresets() {
+            fetch('/api/irrigation/presets')
+                .then(response => response.json())
+                .then(data => {
+                    const select = document.getElementById('preset-select');
+                    select.innerHTML = '<option value="">Select a plant preset</option>';
+                    data.forEach(preset => {
+                        const option = document.createElement('option');
+                        option.value = preset.id;
+                        option.innerText = preset.name;
+                        select.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error:', error));
+        }
 
-            const url = `/weather/report?days=${days}&temperature=${temperature}&humidity=${humidity}&soil_moisture=${soil_moisture}&wind_speed=${wind_speed}&pressure=${pressure}`;
+        // جلب جداول الري بناءً على الـ preset المحدد
+        document.getElementById('preset-select').addEventListener('change', function(event) {
+            const presetId = event.target.value;
+            if (presetId) {
+                fetch(`/api/irrigation/preset/${presetId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const schedulesList = document.getElementById('schedules-list');
+                        schedulesList.innerHTML = '';
+
+                        data.schedules.forEach(schedule => {
+                            const listItem = document.createElement('li');
+                            listItem.className = 'list-group-item';
+                            listItem.innerText = `Start Time: ${schedule.start_time}, Duration: ${schedule.duration} seconds`;
+                            schedulesList.appendChild(listItem);
+                        });
+                    })
+                    .catch(error => console.error('Error:', error));
+            } else {
+                document.getElementById('schedules-list').innerHTML = '';
+            }
+        });
+
+        // تحميل الـ presets عند فتح الصفحة
+        loadPresets();
+
+        // إنشاء تقرير الطقس وعرضه
+        document.getElementById('weather-report-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const startDate = document.getElementById('weather-start-date').value;
+            const endDate = document.getElementById('weather-end-date').value;
+            const temperature = document.getElementById('weather-temperature').checked;
+            const humidity = document.getElementById('weather-humidity').checked;
+            const soil_moisture = document.getElementById('weather-soil-moisture').checked;
+            const wind_speed = document.getElementById('weather-wind-speed').checked;
+            const pressure = document.getElementById('weather-pressure').checked;
+
+            const url = `/weather/report?start_date=${startDate}&end_date=${endDate}&temperature=${temperature}&humidity=${humidity}&soil_moisture=${soil_moisture}&wind_speed=${wind_speed}&pressure=${pressure}`;
 
             fetch(url)
                 .then(response => response.json())
@@ -198,16 +351,54 @@
                 .catch(error => console.error('Error:', error));
         });
 
-        // تحميل التقرير كملف CSV
-        function downloadReport() {
-            const days = document.getElementById('days').value;
-            const temperature = document.getElementById('temperature').checked;
-            const humidity = document.getElementById('humidity').checked;
-            const soil_moisture = document.getElementById('soil_moisture').checked;
-            const wind_speed = document.getElementById('wind_speed').checked;
-            const pressure = document.getElementById('pressure').checked;
+        // إنشاء تقرير الري الذكي وعرضه
+        document.getElementById('irrigation-report-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const startDate = document.getElementById('irrigation-start-date').value;
+            const endDate = document.getElementById('irrigation-end-date').value;
 
-            const url = `/weather/report?days=${days}&temperature=${temperature}&humidity=${humidity}&soil_moisture=${soil_moisture}&wind_speed=${wind_speed}&pressure=${pressure}&download=true`;
+            const url = `/irrigation/api/irrigation/report?start_date=${startDate}&end_date=${endDate}`;
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.querySelector('#irrigation-report-table tbody');
+                    tableBody.innerHTML = '';  // مسح البيانات القديمة
+
+                    data.forEach(entry => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${new Date(entry.timestamp).toLocaleString()}</td>
+                            <td>${entry.pump_status ? 'ON' : 'OFF'}</td>
+                            <td>${entry.water_level}</td>
+                            <td>${entry.pump_duration}</td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                })
+                .catch(error => console.error('Error:', error));
+        });
+
+        // تحميل تقرير الطقس كملف CSV
+        function downloadWeatherReport() {
+            const startDate = document.getElementById('weather-start-date').value;
+            const endDate = document.getElementById('weather-end-date').value;
+            const temperature = document.getElementById('weather-temperature').checked;
+            const humidity = document.getElementById('weather-humidity').checked;
+            const soil_moisture = document.getElementById('weather-soil-moisture').checked;
+            const wind_speed = document.getElementById('weather-wind-speed').checked;
+            const pressure = document.getElementById('weather-pressure').checked;
+
+            const url = `/weather/report?start_date=${startDate}&end_date=${endDate}&temperature=${temperature}&humidity=${humidity}&soil_moisture=${soil_moisture}&wind_speed=${wind_speed}&pressure=${pressure}&download=true`;
+            window.location.href = url;
+        }
+
+        // تحميل تقرير الري الذكي كملف CSV
+        function downloadIrrigationReport() {
+            const startDate = document.getElementById('irrigation-start-date').value;
+            const endDate = document.getElementById('irrigation-end-date').value;
+
+            const url = `/irrigation/api/irrigation/report?start_date=${startDate}&end_date=${endDate}&download=true`;
             window.location.href = url;
         }
 
