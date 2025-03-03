@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Agriculture</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .card {
+            margin: 10px;
+        }
+        .data-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">Smart Agriculture System</h1>
+        
+        <!-- قسم بيانات الطقس -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Weather Data</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush" id="weather-data">
+                            <li class="list-group-item">Temperature: <span id="temp">--</span>°C</li>
+                            <li class="list-group-item">Humidity: <span id="humidity">--</span>%</li>
+                            <li class="list-group-item">Soil Moisture: <span id="soil-moisture">--</span>%</li>
+                            <li class="list-group-item">Wind Speed: <span id="wind-speed">--</span> km/h</li>
+                            <li class="list-group-item">Pressure: <span id="pressure">--</span> hPa</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- قسم حالة المضخة -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Pump Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Pump: <span id="pump-status" class="badge bg-secondary">--</span></p>
+                        <p>Water Level: <span id="water-level">--</span>%</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- قسم التحكم اليدوي في المضخة -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Manual Pump Control</h5>
+                    </div>
+                    <div class="card-body">
+                        <button class="btn btn-success" onclick="startPump()">Start Pump</button>
+                        <button class="btn btn-danger" onclick="stopPump()">Stop Pump</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- قسم إنشاء التقارير -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Generate Weather Report</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="report-form">
+                            <div class="mb-3">
+                                <label for="days" class="form-label">Number of Days:</label>
+                                <input type="number" class="form-control" id="days" name="days" min="1" value="7">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Select Data to Include:</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="temperature" name="temperature" checked>
+                                    <label class="form-check-label" for="temperature">Temperature (°C)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="humidity" name="humidity" checked>
+                                    <label class="form-check-label" for="humidity">Humidity (%)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="soil_moisture" name="soil_moisture" checked>
+                                    <label class="form-check-label" for="soil_moisture">Soil Moisture (%)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="wind_speed" name="wind_speed" checked>
+                                    <label class="form-check-label" for="wind_speed">Wind Speed (km/h)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="pressure" name="pressure" checked>
+                                    <label class="form-check-label" for="pressure">Pressure (hPa)</label>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Generate Report</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- قسم عرض التقرير -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Weather Report</h5>
+                    </div>
+                    <div class="card-body data-container">
+                        <table class="table" id="weather-report-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Avg Temperature (°C)</th>
+                                    <th>Avg Humidity (%)</th>
+                                    <th>Avg Soil Moisture (%)</th>
+                                    <th>Avg Wind Speed (km/h)</th>
+                                    <th>Avg Pressure (hPa)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- البيانات ستضاف هنا عبر JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="card-footer">
+                        <button class="btn btn-success" onclick="downloadReport()">Download Report (CSV)</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        var socket = io();
+
+        // تحديث بيانات الطقس في الوقت الفعلي
+        socket.on('update_weather', function(data) {
+            document.getElementById('temp').innerText = data.temperature;
+            document.getElementById('humidity').innerText = data.humidity;
+            document.getElementById('soil-moisture').innerText = data.soil_moisture;
+            document.getElementById('wind-speed').innerText = data.wind_speed;
+            document.getElementById('pressure').innerText = data.pressure;
+        });
+
+        // تحديث حالة المضخة في الوقت الفعلي
+        socket.on('update_irrigation', function(data) {
+            const pumpStatus = document.getElementById('pump-status');
+            pumpStatus.innerText = data.pump_status ? 'ON' : 'OFF';
+            pumpStatus.className = data.pump_status ? 'badge bg-success' : 'badge bg-danger';
+
+            document.getElementById('water-level').innerText = data.water_level;
+        });
+
+        // إنشاء التقرير وعرضه
+        document.getElementById('report-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const days = document.getElementById('days').value;
+            const temperature = document.getElementById('temperature').checked;
+            const humidity = document.getElementById('humidity').checked;
+            const soil_moisture = document.getElementById('soil_moisture').checked;
+            const wind_speed = document.getElementById('wind_speed').checked;
+            const pressure = document.getElementById('pressure').checked;
+
+            const url = `/weather/report?days=${days}&temperature=${temperature}&humidity=${humidity}&soil_moisture=${soil_moisture}&wind_speed=${wind_speed}&pressure=${pressure}`;
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.querySelector('#weather-report-table tbody');
+                    tableBody.innerHTML = '';  // مسح البيانات القديمة
+
+                    data.forEach(entry => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${new Date(entry.timestamp).toLocaleString()}</td>
+                            ${temperature ? `<td>${entry.avg_temperature?.toFixed(2) || '--'}</td>` : ''}
+                            ${humidity ? `<td>${entry.avg_humidity?.toFixed(2) || '--'}</td>` : ''}
+                            ${soil_moisture ? `<td>${entry.avg_soil_moisture?.toFixed(2) || '--'}</td>` : ''}
+                            ${wind_speed ? `<td>${entry.avg_wind_speed?.toFixed(2) || '--'}</td>` : ''}
+                            ${pressure ? `<td>${entry.avg_pressure?.toFixed(2) || '--'}</td>` : ''}
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                })
+                .catch(error => console.error('Error:', error));
+        });
+
+        // تحميل التقرير كملف CSV
+        function downloadReport() {
+            const days = document.getElementById('days').value;
+            const temperature = document.getElementById('temperature').checked;
+            const humidity = document.getElementById('humidity').checked;
+            const soil_moisture = document.getElementById('soil_moisture').checked;
+            const wind_speed = document.getElementById('wind_speed').checked;
+            const pressure = document.getElementById('pressure').checked;
+
+            const url = `/weather/report?days=${days}&temperature=${temperature}&humidity=${humidity}&soil_moisture=${soil_moisture}&wind_speed=${wind_speed}&pressure=${pressure}&download=true`;
+            window.location.href = url;
+        }
+
+        // تشغيل المضخة يدويًا
+        function startPump() {
+            fetch('/irrigation/api/irrigation/manual', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ action: 'start' }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        // إيقاف المضخة يدويًا
+        function stopPump() {
+            fetch('/irrigation/api/irrigation/manual', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ action: 'stop' }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message + ". Duration: " + data.duration + " seconds");
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    </script>
+</body>
+</html>
