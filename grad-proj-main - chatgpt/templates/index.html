@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Agriculture</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .card {
+            margin: 10px;
+            border-radius: 8px;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .card-header {
+            background-color: #007bff;
+            color: white;
+            border-radius: 8px 8px 0 0;
+        }
+        .btn {
+            border-radius: 20px;
+            transition: background-color 0.3s;
+        }
+        .btn-success:hover {
+            background-color: #28a745;
+        }
+        .btn-danger:hover {
+            background-color: #dc3545;
+        }
+        .badge {
+            font-size: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">Smart Agriculture System</h1>
+
+        <!-- قسم الساعة الحقيقية -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Real-Time Clock</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Current Time: <span id="current-time" class="fw-bold">--:--:--</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- قسم بيانات الطقس -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Weather Data</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush" id="weather-data">
+                            <li class="list-group-item">Temperature: <span id="temp" class="fw-bold">--</span>°C</li>
+                            <li class="list-group-item">Humidity: <span id="humidity" class="fw-bold">--</span>%</li>
+                            <li class="list-group-item">Soil Moisture: <span id="soil-moisture" class="fw-bold">--</span>%</li>
+                            <li class="list-group-item">Wind Speed: <span id="wind-speed" class="fw-bold">--</span> km/h</li>
+                            <li class="list-group-item">Pressure: <span id="pressure" class="fw-bold">--</span> hPa</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+                        <!-- قسم حالة مشروع الري -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Irrigation System Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Pump: <span id="pump-status" class="badge bg-secondary">--</span></p>
+                        <p>Water Level: <span id="water-level" class="fw-bold">--</span>%</p>
+                        <p>Running Time: <span id="running-time" class="fw-bold">0</span> seconds</p>
+                        <button class="btn btn-success mt-2" onclick="startPump()">Start Pump</button>
+                        <button class="btn btn-danger mt-2" onclick="stopPump()">Stop Pump</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- قسم إنشاء التقارير -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Generate Reports</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="report-form">
+                            <div class="mb-3">
+                                <label for="report-type" class="form-label">Select Report Type:</label>
+                                <select id="report-type" class="form-select">
+                                    <option value="weather">Weather Report</option>
+                                    <option value="irrigation">Irrigation Report</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="report-start-date" class="form-label">Start Date:</label>
+                                <input type="date" class="form-control" id="report-start-date" name="start_date" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="report-end-date" class="form-label">End Date:</label>
+                                <input type="date" class="form-control" id="report-end-date" name="end_date" required>
+                            </div>
+                            <div id="weather-options" class="mb-3">
+                                <label class="form-label">Select Data to Include:</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="weather-temperature" name="temperature" checked>
+                                    <label class="form-check-label" for="weather-temperature">Temperature (°C)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="weather-humidity" name="humidity" checked>
+                                    <label class="form-check-label" for="weather-humidity">Humidity (%)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="weather-soil-moisture" name="soil_moisture" checked>
+                                    <label class="form-check-label" for="weather-soil-moisture">Soil Moisture (%)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="weather-wind-speed" name="wind_speed" checked>
+                                    <label class="form-check-label" for="weather-wind-speed">Wind Speed (km/h)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="weather-pressure" name="pressure" checked>
+                                    <label class="form-check-label" for="weather-pressure">Pressure (hPa)</label>
+                                </div>
+                            </div>
+                            <div id="irrigation-options" class="mb-3" style="display: none;">
+                                <label class="form-label">Select Data to Include:</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="irrigation-pump-status" name="pump_status" checked>
+                                    <label class="form-check-label" for="irrigation-pump-status">Pump Status</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="irrigation-water-level" name="water_level" checked>
+                                    <label class="form-check-label" for="irrigation-water-level">Water Level (%)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="irrigation-duration" name="duration" checked>
+                                    <label class="form-check-label" for="irrigation-duration">Pump Duration (seconds)</label>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Generate Report</button>
+                            <button type="button" class="btn btn-secondary" onclick="clearReports()">Clear Reports</button>
+                            <button type="button" class="btn btn-success" onclick="downloadReport()">Download CSV</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+                <!-- قسم عرض التقارير -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title">Reports</h5>
+                    </div>
+                    <div class="card-body data-container" id="report-display">
+                        <!-- سيتم عرض التقارير هنا -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        var socket = io();
+        var pumpRunning = false;
+        var runningTime = 0;
+        var runningInterval;
+
+        // تحديث الوقت الحقيقي
+        socket.on('update_time', function(data) {
+            document.getElementById('current-time').innerText = data.time;
+        });
+
+        // تحديث بيانات الطقس في الوقت الفعلي
+        socket.on('update_weather', function(data) {
+            document.getElementById('temp').innerText = data.temperature;
+            document.getElementById('humidity').innerText = data.humidity;
+            document.getElementById('soil-moisture').innerText = data.soil_moisture;
+            document.getElementById('wind-speed').innerText = data.wind_speed;
+            document.getElementById('pressure').innerText = data.pressure;
+        });
+
+        // تحديث حالة المضخة في الوقت الفعلي
+        socket.on('update_irrigation', function(data) {
+            const pumpStatus = document.getElementById('pump-status');
+            pumpStatus.innerText = data.pump_status ? 'ON' : 'OFF';
+            pumpStatus.className = data.pump_status ? 'badge bg-success' : 'badge bg-danger';
+
+            document.getElementById('water-level').innerText = data.water_level;
+
+            if (data.pump_status && !pumpRunning) {
+                startRunningTimer();
+            } else if (!data.pump_status && pumpRunning) {
+                stopRunningTimer();
+            }
+        });
+
+        // تغيير خيارات التقرير بناءً على نوع التقرير المحدد
+        document.getElementById('report-type').addEventListener('change', function(event) {
+            const reportType = event.target.value;
+            document.getElementById('weather-options').style.display = reportType === 'weather' ? 'block' : 'none';
+            document.getElementById('irrigation-options').style.display = reportType === 'irrigation' ? 'block' : 'none';
+        });
+
+        // إنشاء التقرير وعرضه
+        document.getElementById('report-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const reportType = document.getElementById('report-type').value;
+            const startDate = document.getElementById('report-start-date').value;
+            const endDate = document.getElementById('report-end-date').value;
+            let url = '';
+
+            if (reportType === 'weather') {
+                const temperature = document.getElementById('weather-temperature').checked;
+                const humidity = document.getElementById('weather-humidity').checked;
+                const soil_moisture = document.getElementById('weather-soil-moisture').checked;
+                const wind_speed = document.getElementById('weather-wind-speed').checked;
+                const pressure = document.getElementById('weather-pressure').checked;
+
+                url = `/weather/report?start_date=${startDate}&end_date=${endDate}&temperature=${temperature}&humidity=${humidity}&soil_moisture=${soil_moisture}&wind_speed=${wind_speed}&pressure=${pressure}`;
+            } else if (reportType === 'irrigation') {
+                const pump_status = document.getElementById('irrigation-pump-status').checked;
+                const water_level = document.getElementById('irrigation-water-level').checked;
+                const duration = document.getElementById('irrigation-duration').checked;
+
+                url = `/irrigation/api/irrigation/report?start_date=${startDate}&end_date=${endDate}&pump_status=${pump_status}&water_level=${water_level}&duration=${duration}`;
+            }
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    const reportDisplay = document.getElementById('report-display');
+                    reportDisplay.innerHTML = '';  // مسح البيانات القديمة
+
+                    const table = document.createElement('table');
+                    table.className = 'table';
+
+                    const thead = document.createElement('thead');
+                    const headerRow = document.createElement('tr');
+
+                    if (reportType === 'weather') {
+                        headerRow.innerHTML = `
+                            <th>Timestamp</th>
+                            ${temperature ? '<th>Avg Temperature (°C)</th>' : ''}
+                            ${humidity ? '<th>Avg Humidity (%)</th>' : ''}
+                            ${soil_moisture ? '<th>Avg Soil Moisture (%)</th>' : ''}
+                            ${wind_speed ? '<th>Avg Wind Speed (km/h)</th>' : ''}
+                            ${pressure ? '<th>Avg Pressure (hPa)</th>' : ''}
+                        `;
+                    } else if (reportType === 'irrigation') {
+                        headerRow.innerHTML = `
+                            <th>Timestamp</th>
+                            ${pump_status ? '<th>Pump Status</th>' : ''}
+                            ${water_level ? '<th>Water Level (%)</th>' : ''}
+                            ${duration ? '<th>Pump Duration (seconds)</th>' : ''}
+                        `;
+                    }
+
+                    thead.appendChild(headerRow);
+                    table.appendChild(thead);
+
+                    const tbody = document.createElement('tbody');
+                    data.forEach(entry => {
+                        const row = document.createElement('tr');
+                        if (reportType === 'weather') {
+                            row.innerHTML = `
+                                <td>${new Date(entry.timestamp).toLocaleString()}</td>
+                                ${temperature ? `<td>${entry.avg_temperature?.toFixed(2) || '--'}</td>` : ''}
+                                ${humidity ? `<td>${entry.avg_humidity?.toFixed(2) || '--'}</td>` : ''}
+                                ${soil_moisture ? `<td>${entry.avg_soil_moisture?.toFixed(2) || '--'}</td>` : ''}
+                                ${wind_speed ? `<td>${entry.avg_wind_speed?.toFixed(2) || '--'}</td>` : ''}
+                                ${pressure ? `<td>${entry.avg_pressure?.toFixed(2) || '--'}</td>` : ''}
+                            `;
+                        } else if (reportType === 'irrigation') {
+                            row.innerHTML = `
+                                <td>${new Date(entry.timestamp).toLocaleString()}</td>
+                                ${pump_status ? `<td>${entry.pump_status ? 'ON' : 'OFF'}</td>` : ''}
+                                ${water_level ? `<td>${entry.water_level}</td>` : ''}
+                                ${duration ? `<td>${entry.pump_duration}</td>` : ''}
+                            `;
+                        }
+                        tbody.appendChild(row);
+                    });
+
+                    table.appendChild(tbody);
+                    reportDisplay.appendChild(table);
+                })
+                .catch(error => console.error('Error:', error));
+        });
+
+        // تنظيف منطقة عرض التقارير
+        function clearReports() {
+            document.getElementById('report-display').innerHTML = '';
+        }
+
+        // تحميل التقرير كملف CSV
+        function downloadReport() {
+            const reportType = document.getElementById('report-type').value;
+            const startDate = document.getElementById('report-start-date').value;
+            const endDate = document.getElementById('report-end-date').value;
+            let url = '';
+
+            if (reportType === 'weather') {
+                const temperature = document.getElementById('weather-temperature').checked;
+                const humidity = document.getElementById('weather-humidity').checked;
+                const soil_moisture = document.getElementById('weather-soil-moisture').checked;
+                const wind_speed = document.getElementById('weather-wind-speed').checked;
+                const pressure = document.getElementById('weather-pressure').checked;
+
+                url = `/weather/report?start_date=${startDate}&end_date=${endDate}&temperature=${temperature}&humidity=${humidity}&soil_moisture=${soil_moisture}&wind_speed=${wind_speed}&pressure=${pressure}&download=true`;
+            } else if (reportType === 'irrigation') {
+                const pump_status = document.getElementById('irrigation-pump-status').checked;
+                const water_level = document.getElementById('irrigation-water-level').checked;
+                const duration = document.getElementById('irrigation-duration').checked;
+
+                url = `/irrigation/api/irrigation/report?start_date=${startDate}&end_date=${endDate}&pump_status=${pump_status}&water_level=${water_level}&duration=${duration}&download=true`;
+            }
+
+            window.location.href = url;
+        }
+
+        // تشغيل المضخة يدويًا
+        function startPump() {
+            fetch('/irrigation/api/irrigation/manual', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ action: 'start' }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+                if (!pumpRunning) {
+                    startRunningTimer();
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        // إيقاف المضخة يدويًا
+        function stopPump() {
+            fetch('/irrigation/api/irrigation/manual', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ action: 'stop' }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message + ". Duration: " + data.duration + " seconds");
+                if (pumpRunning) {
+                    stopRunningTimer();
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        // بدء عداد الوقت
+        function startRunningTimer() {
+            pumpRunning = true;
+            runningInterval = setInterval(() => {
+                runningTime++;
+                document.getElementById('running-time').innerText = runningTime;
+            }, 1000);
+        }
+
+        // إيقاف عداد الوقت
+        function stopRunningTimer() {
+            pumpRunning = false;
+            clearInterval(runningInterval);
+            runningTime = 0;
+            document.getElementById('running-time').innerText = runningTime;
+        }
+    </script>
+</body>
+</html>
