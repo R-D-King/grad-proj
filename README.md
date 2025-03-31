@@ -50,3 +50,34 @@ A web-based irrigation system with weather monitoring capabilities.
 
 - `POST /api/reports/generate` - Generate a report
 - `GET /api/reports/download` - Download a report as CSV
+
+## Known Issues
+
+The following issues are currently being addressed:
+
+1. Preset Management:
+   - Cannot create or load irrigation presets
+   - No way to select and activate a preset while deactivating others
+
+2. Report Generation:
+   - Report column options don't change with the selected report type
+   - Clear button for reports is not functioning
+   
+3. Date Selection:
+   - Default dates for reports are not displaying properly
+
+## Potential Issues
+
+These are additional concerns that may need attention:
+
+1. Timer Functionality:
+   - Running time counter may reset unexpectedly
+   - Elapsed time display for manual irrigation needs improvement
+
+2. Error Handling:
+   - Insufficient error handling for API requests
+   - No user feedback when server connections fail
+
+3. UI/UX Issues:
+   - Inconsistent responsive design on smaller screens
+   - Limited accessibility features
