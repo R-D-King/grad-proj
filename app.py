@@ -15,6 +15,11 @@ app.config['SECRET_KEY'] = 'your-secret-key'
 # Use the config from shared.config
 app.config.from_object('shared.config.Config')
 
+# Ensure instance directory exists
+instance_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance')
+if not os.path.exists(instance_dir):
+    os.makedirs(instance_dir)
+
 # Initialize extensions
 db.init_app(app)
 socketio = SocketIO(app)
