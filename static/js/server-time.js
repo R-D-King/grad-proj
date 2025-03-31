@@ -16,8 +16,8 @@ function syncServerTime() {
             
             console.log(`Time synced with server. Offset: ${serverTimeOffset}ms`);
             
-            // Update any time displays
-            updateTimeDisplays();
+            // Update time display immediately
+            updateTimeDisplay();
         })
         .catch(error => {
             console.error('Error syncing time with server:', error);
@@ -29,38 +29,42 @@ function getServerAdjustedTime() {
     return new Date(Date.now() + serverTimeOffset);
 }
 
-// Format time as HH:MM
-function formatTimeHHMM(date) {
-    return date.getHours().toString().padStart(2, '0') + ':' + 
-           date.getMinutes().toString().padStart(2, '0');
-}
-
-// Update any time displays on the page
-function updateTimeDisplays() {
+// Update the server time display
+function updateTimeDisplay() {
     const serverTime = getServerAdjustedTime();
-    
-    // Update server time display if it exists
     const timeDisplay = document.getElementById('server-time-display');
+    
     if (timeDisplay) {
-        timeDisplay.textContent = serverTime.toLocaleTimeString();
+        // Format time as HH:MM:SS
+        const hours = serverTime.getHours().toString().padStart(2, '0');
+        const minutes = serverTime.getMinutes().toString().padStart(2, '0');
+        const seconds = serverTime.getSeconds().toString().padStart(2, '0');
+        timeDisplay.textContent = `${hours}:${minutes}:${seconds}`;
     }
 }
 
-// Sync time when page loads
+// Initialize when document is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    // Initial sync
+    // Initial sync with server
     syncServerTime();
     
-    // Set up periodic sync (every 15 minutes)
-    setInterval(syncServerTime, 15 * 60 * 1000);
+    // Update time display every second
+    setInterval(updateTimeDisplay, 1000);
     
-    // Update clock display every second
-    setInterval(updateTimeDisplays, 1000);
+    // Re-sync with server every 5 minutes to prevent drift
+    setInterval(syncServerTime, 5 * 60 * 1000);
 });
 
 // Function to check if a schedule should run based on server time
 function checkScheduleTime(scheduleTime) {
     const serverTime = getServerAdjustedTime();
-    const currentTimeHHMM = formatTimeHHMM(serverTime);
+    const currentHour = serverTime.getHours().toString().padStart(2, '0');
+    const currentMinute = serverTime.getMinutes().toString().padStart(2, '0');
+    const currentTimeHHMM = `${currentHour}:${currentMinute}`;
+    
     return currentTimeHHMM === scheduleTime;
 }
+
+// Make these functions available globally for other scripts
+window.getServerAdjustedTime = getServerAdjustedTime;
+window.checkScheduleTime = checkScheduleTime;

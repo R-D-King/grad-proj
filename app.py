@@ -19,10 +19,6 @@ app.config.from_object('shared.config.Config')
 db.init_app(app)
 socketio = SocketIO(app)
 
-# Create database tables using SQLAlchemy
-with app.app_context():
-    db.create_all()
-
 # Add a route to get server time
 @app.route('/api/server-time')
 def get_server_time():
@@ -34,6 +30,10 @@ def get_server_time():
         'date': now.strftime('%Y-%m-%d'),
         'time': now.strftime('%H:%M:%S')
     })
+
+# Create database tables using SQLAlchemy
+with app.app_context():
+    db.create_all()
 
 # Sample data for testing
 weather_data = {
