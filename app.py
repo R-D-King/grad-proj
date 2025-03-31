@@ -8,6 +8,7 @@ import io
 from datetime import datetime, timedelta
 from smart_irrigation.models import IrrigationPreset, IrrigationSchedule, IrrigationData, WeatherData
 from shared.config import db
+from time_utils import time_utils
 
 # Initialize Flask app
 app = Flask(__name__, static_folder='static')
@@ -35,6 +36,32 @@ def get_server_time():
         'date': now.strftime('%Y-%m-%d'),
         'time': now.strftime('%H:%M:%S')
     })
+
+# Add these new routes for server time functionality
+
+@app.route('/api/server-time/formatted')
+def get_formatted_server_time():
+    """Return formatted server time"""
+    now = datetime.now()
+    return jsonify({
+        'formatted_time': now.strftime('%H:%M:%S'),
+        'date': now.strftime('%Y-%m-%d')
+    })
+
+app.register_blueprint(time_utils)
+
+@app.route('/api/schedule/<int:schedule_id>/should-run')
+def should_schedule_run(schedule_id):
+    """Check if a schedule should run based on current server time"""
+    from time_utils import is_time_to_run_schedule
+    
+    with app.app_context():
+        schedule = IrrigationSchedule.query.get(schedule_id)
+        if not schedule:
+            return jsonify({'should_run': False})
+        
+        should_run = is_time_to_run_schedule(schedule)
+        return jsonify({'should_run': should_run})
 
 # Create database tables using SQLAlchemy
 with app.app_context():

@@ -1,9 +1,11 @@
 from flask import Blueprint
-from shared.socketio import socketio  # استيراد socketio من التطبيق الرئيسي
+from shared.socketio import socketio  # Import socketio from main application
 
-# إنشاء Blueprint
+# Create Blueprint
 irrigation_app = Blueprint('irrigation_app', __name__)
 
-# لا داعي لإنشاء socketio هنا، لأنه مستورد من التطبيق الرئيسي
+# No need to create socketio here, as it is imported from the main application
+from . import preset_routes, schedule_routes, irrigation_data_routes, manual_control
 
+# For backward compatibility, import all routes into views
 from . import views

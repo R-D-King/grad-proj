@@ -1,70 +1,43 @@
-// Server time synchronization
-let serverTimeOffset = 0;
-let lastSyncTime = 0;
-
-// Function to sync with server time
-function syncServerTime() {
-    const clientTime = Date.now();
-    
-    fetch('/api/server-time')
-        .then(response => response.json())
-        .then(data => {
-            // Calculate offset between server and client time
-            const serverTime = data.timestamp * 1000; // Convert to milliseconds
-            serverTimeOffset = serverTime - clientTime;
-            lastSyncTime = clientTime;
-            
-            console.log(`Time synced with server. Offset: ${serverTimeOffset}ms`);
-            
-            // Update time display immediately
-            updateTimeDisplay();
-        })
-        .catch(error => {
-            console.error('Error syncing time with server:', error);
-        });
-}
-
-// Get current time adjusted to server time
-function getServerAdjustedTime() {
-    return new Date(Date.now() + serverTimeOffset);
-}
+// Server time synchronization - minimal version
+document.addEventListener('DOMContentLoaded', function() {
+    // Update time display every second
+    setInterval(updateTimeDisplay, 1000);
+});
 
 // Update the server time display
 function updateTimeDisplay() {
-    const serverTime = getServerAdjustedTime();
-    const timeDisplay = document.getElementById('server-time-display');
-    
-    if (timeDisplay) {
-        // Format time as HH:MM:SS
-        const hours = serverTime.getHours().toString().padStart(2, '0');
-        const minutes = serverTime.getMinutes().toString().padStart(2, '0');
-        const seconds = serverTime.getSeconds().toString().padStart(2, '0');
-        timeDisplay.textContent = `${hours}:${minutes}:${seconds}`;
-    }
+    fetch('/api/server-time/display')
+        .then(response => response.json())
+        .then(data => {
+            const timeDisplay = document.getElementById('server-time-display');
+            if (timeDisplay) {
+                timeDisplay.textContent = data.formatted_time;
+                timeDisplay.style.color = ''; // Reset to default color
+            }
+        })
+        .catch(error => {
+            console.error('Error getting server time:', error);
+            // Display offline message when server is not responding
+            const timeDisplay = document.getElementById('server-time-display');
+            if (timeDisplay) {
+                timeDisplay.textContent = 'Server offline';
+                timeDisplay.style.color = 'red'; // Set text color to red
+            }
+        });
 }
 
-// Initialize when document is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    // Initial sync with server
-    syncServerTime();
-    
-    // Update time display every second
-    setInterval(updateTimeDisplay, 1000);
-    
-    // Re-sync with server every 5 minutes to prevent drift
-    setInterval(syncServerTime, 5 * 60 * 1000);
-});
-
-// Function to check if a schedule should run based on server time
-function checkScheduleTime(scheduleTime) {
-    const serverTime = getServerAdjustedTime();
-    const currentHour = serverTime.getHours().toString().padStart(2, '0');
-    const currentMinute = serverTime.getMinutes().toString().padStart(2, '0');
-    const currentTimeHHMM = `${currentHour}:${currentMinute}`;
-    
-    return currentTimeHHMM === scheduleTime;
+// Function to check schedule time - fully server-side implementation
+function checkScheduleTime(scheduleId) {
+    return fetch(`/api/schedule/${scheduleId}/should-run`)
+        .then(response => response.json())
+        .then(data => {
+            return data.should_run;
+        })
+        .catch(error => {
+            console.error('Error checking schedule time:', error);
+            return false;
+        });
 }
 
-// Make these functions available globally for other scripts
-window.getServerAdjustedTime = getServerAdjustedTime;
+// Make function available globally
 window.checkScheduleTime = checkScheduleTime;
