@@ -1,3 +1,4 @@
 from flask_socketio import SocketIO
 
-socketio = SocketIO()  # إنشاء كائن socketio
+# Create SocketIO instance
+socketio = SocketIO()
