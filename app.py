@@ -52,8 +52,10 @@ def create_app():
     
     # Import blueprints
     from shared.routes import shared_bp
-    from shared.reports import reports_bp
+    
+    # Instead, ensure we're using:
     from irrigation.routes import irrigation_bp
+    from reports.routes import reports_bp
     from weather.routes import weather_bp
     
     # Register blueprints

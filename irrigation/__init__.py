@@ -1,5 +1,10 @@
 from flask import Blueprint
-from shared.socketio import socketio  # Import socketio from main application
 
 # Create Blueprint
-irrigation_app = Blueprint('irrigation_app', __name__)
+irrigation_bp = Blueprint('irrigation', __name__)
+
+# Import routes after creating the blueprint to avoid circular imports
+from . import routes
+
+# Remove any problematic imports if they exist
+# from . import views  # Remove if present
