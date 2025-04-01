@@ -1,6 +1,46 @@
 from datetime import datetime
 from shared.database import db
 
+class IrrigationPreset(db.Model):
+    """Model for irrigation presets."""
+    __tablename__ = 'irrigation_presets'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    duration = db.Column(db.Integer, default=300)  # Duration in seconds
+    water_level = db.Column(db.Integer, default=50)  # Water level threshold in percentage
+    active = db.Column(db.Boolean, default=False)
+    auto_start = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    
+    def to_dict(self):
+        """Convert the model to a dictionary."""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'duration': self.duration,
+            'water_level': self.water_level,
+            'active': self.active,
+            'auto_start': self.auto_start,
+            'created_at': self.created_at.isoformat()
+        }
+
+class PumpLog(db.Model):
+    """Model for pump action logs."""
+    __tablename__ = 'pump_logs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    action = db.Column(db.String(50), nullable=False)  # 'start', 'stop', etc.
+    timestamp = db.Column(db.DateTime, default=datetime.now)
+    
+    def to_dict(self):
+        """Convert the model to a dictionary."""
+        return {
+            'id': self.id,
+            'action': self.action,
+            'timestamp': self.timestamp.isoformat()
+        }
+
 class Preset(db.Model):
     __tablename__ = 'presets'
     

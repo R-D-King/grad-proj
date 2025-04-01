@@ -1,277 +1,436 @@
+// Main Application JavaScript
+
+// Wait for the DOM to be fully loaded
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Socket.IO connection
-    const socket = io();
+    console.log('Application initialized');
     
-    // Initialize UI components
-    initializeUI();
+    // Initialize modules
+    initializeModules();
     
-    // Set up Socket.IO event listeners
-    setupSocketListeners(socket);
-    
-    // Set up UI event listeners
+    // Set up event listeners
     setupEventListeners();
     
-    // Load presets on page load
-    loadPresets();
+    // Set up clock with reduced frequency (every 10 seconds)
+    updateServerTime();
+    setInterval(updateServerTime, 10000);
+    
+    // Use local clock for second-by-second updates
+    setInterval(updateLocalTime, 1000);
 });
 
-// Initialize Bootstrap modals
-function initializeUI() {
-    window.addPresetModal = new bootstrap.Modal(document.getElementById('addPresetModal'));
-    window.addScheduleModal = new bootstrap.Modal(document.getElementById('addScheduleModal'));
-    window.editScheduleModal = new bootstrap.Modal(document.getElementById('editScheduleModal'));
+// Function to update server time
+function updateServerTime() {
+    const timeDisplay = document.getElementById('server-time-display');
+    if (timeDisplay) {
+        fetch('/api/server-time/display')
+            .then(response => response.json())
+            .then(data => {
+                timeDisplay.textContent = data.formatted_time || '00:00:00';
+                timeDisplay.classList.remove('text-danger');
+                // Store last successful time update
+                window.lastTimeUpdate = Date.now();
+            })
+            .catch(error => {
+                console.error('Error fetching server time:', error);
+                // If it's been more than 5 seconds since last update, show offline
+                if (!window.lastTimeUpdate || Date.now() - window.lastTimeUpdate > 5000) {
+                    timeDisplay.textContent = 'OFFLINE';
+                    timeDisplay.classList.add('text-danger');
+                }
+            });
+    }
 }
 
-// Set up Socket.IO event listeners
-function setupSocketListeners(socket) {
-    // Weather data updates
-    socket.on('weather_update', function(data) {
-        document.getElementById('temp').innerText = data.temperature;
-        document.getElementById('humidity').innerText = data.humidity;
-        document.getElementById('soil-moisture').innerText = data.soil_moisture;
-        document.getElementById('wind-speed').innerText = data.wind_speed;
-        document.getElementById('pressure').innerText = data.pressure;
-    });
-    
-    // Irrigation system updates
-    socket.on('pump_status', function(data) {
-        const pumpStatus = document.getElementById('pump-status');
-        pumpStatus.innerText = data.status === 'running' ? 'Running' : 'Stopped';
-        pumpStatus.className = `badge ${data.status === 'running' ? 'bg-success' : 'bg-secondary'}`;
-        
-        if (data.status === 'running') {
-            startRunningTimer();
-        } else {
-            stopRunningTimer();
-        }
-    });
-    
-    socket.on('water_level', function(data) {
-        document.getElementById('water-level').innerText = data.level;
-    });
-    
-    socket.on('preset_activated', function(data) {
-        document.getElementById('current-preset').innerText = data.name;
-    });
-}
-
-// Set up UI event listeners
-function setupEventListeners() {
-    // Manual pump control
-    document.getElementById('manual-on-btn').addEventListener('click', function() {
-        if (confirm('Are you sure you want to start the pump?')) {
-            fetch('/api/irrigation/pump/start', { method: 'POST' });
-        }
-    });
-    
-    document.getElementById('manual-off-btn').addEventListener('click', function() {
-        if (confirm('Are you sure you want to stop the pump?')) {
-            fetch('/api/irrigation/pump/stop', { method: 'POST' });
-        }
-    });
-    
-    // Preset management
-    document.getElementById('addPresetBtn').addEventListener('click', () => addPresetModal.show());
-    document.getElementById('savePresetBtn').addEventListener('click', saveNewPreset);
-    
-    // Schedule management
-    document.getElementById('addScheduleBtn').addEventListener('click', () => addScheduleModal.show());
-    document.getElementById('saveScheduleBtn').addEventListener('click', saveNewSchedule);
-    document.getElementById('updateScheduleBtn').addEventListener('click', updateSchedule);
-    
-    // Report buttons
-    document.getElementById('generateReportBtn').addEventListener('click', generateReport);
-    document.getElementById('downloadReportBtn').addEventListener('click', downloadReport);
-    document.getElementById('clearReportBtn').addEventListener('click', clearReports);
-    document.getElementById('report-type').addEventListener('change', toggleReportOptions);
-}
-
-// Server time functionality
-document.addEventListener('DOMContentLoaded', function() {
-    // Update time display every second, but only fetch from server every 30 seconds
-    let serverTimeOffset = 0;
-    let lastFetchTime = 0;
-    
-    function updateTimeDisplay() {
-        const timeDisplay = document.getElementById('server-time-display');
-        if (!timeDisplay) return;
-        
+// Function to update time locally between server syncs
+function updateLocalTime() {
+    const timeDisplay = document.getElementById('server-time-display');
+    // Only update locally if we're not in offline mode
+    if (timeDisplay && !timeDisplay.classList.contains('text-danger')) {
         const now = new Date();
-        const currentTime = now.getTime();
-        
-        // Only fetch from server every 30 seconds to reduce requests
-        if (currentTime - lastFetchTime > 30000) {
-            fetch('/api/server-time/display')
-                .then(response => response.json())
-                .then(data => {
-                    timeDisplay.textContent = data.formatted_time;
-                    timeDisplay.style.color = '';
-                    lastFetchTime = currentTime;
-                })
-                .catch(error => {
-                    console.error('Error getting server time:', error);
-                    timeDisplay.textContent = 'Server offline';
-                    timeDisplay.style.color = 'red';
-                });
-        } else {
-            // Update time locally between server fetches
-            const hours = now.getHours().toString().padStart(2, '0');
-            const minutes = now.getMinutes().toString().padStart(2, '0');
-            const seconds = now.getSeconds().toString().padStart(2, '0');
-            timeDisplay.textContent = `${hours}:${minutes}:${seconds}`;
-        }
+        // Format consistently in 24-hour format
+        timeDisplay.textContent = now.toLocaleTimeString('en-US', {
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    }
+}
+
+// Function to initialize all modules
+function initializeModules() {
+    console.log('Initializing modules');
+    
+    // Initialize report options if the element exists
+    const reportTypeSelect = document.getElementById('report-type');
+    if (reportTypeSelect) {
+        toggleReportOptions();
     }
     
-    // Update time display every second
-    setInterval(updateTimeDisplay, 1000);
+    // Load weather data
+    loadWeatherData();
     
-    // Initial update
-    updateTimeDisplay();
-});
+    // Load irrigation status
+    loadIrrigationStatus();
+}
 
-// Function to check schedule time - fully server-side implementation
-function checkScheduleTime(scheduleId) {
-    return fetch(`/api/schedule/${scheduleId}/should-run`)
+// Function to load weather data
+function loadWeatherData() {
+    fetch('/api/weather/current')
         .then(response => response.json())
         .then(data => {
-            return data.should_run;
+            if (data) {
+                // Use a more efficient approach to update multiple elements
+                updateElementText('temp', data.temperature);
+                updateElementText('humidity', data.humidity);
+                updateElementText('soil-moisture', data.soil_moisture);
+                updateElementText('wind-speed', data.wind_speed);
+                updateElementText('pressure', data.pressure);
+            }
         })
         .catch(error => {
-            console.error('Error checking schedule time:', error);
-            return false;
+            console.error('Error loading weather data:', error);
         });
 }
 
-// Timer functions for pump running time
-let runningInterval;
-let runningTime = 0;
-
-function startRunningTimer() {
-    runningTime = 0;
-    document.getElementById('running-time').innerText = runningTime;
-    runningInterval = setInterval(function() {
-        runningTime++;
-        document.getElementById('running-time').innerText = runningTime;
-    }, 1000);
+// Helper function to update element text with fallback
+function updateElementText(elementId, value, fallback = '--') {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.textContent = value || fallback;
+    }
 }
 
-function stopRunningTimer() {
-    clearInterval(runningInterval);
-    runningTime = 0;
-    document.getElementById('running-time').innerText = runningTime;
+// Global variables for pump timer
+let pumpTimerInterval = null;
+
+// Function to load irrigation status
+function loadIrrigationStatus() {
+    fetch('/api/irrigation/status')
+        .then(response => response.json())
+        .then(data => {
+            if (data) {
+                const pumpStatus = document.getElementById('pump-status');
+                if (pumpStatus) {
+                    pumpStatus.textContent = data.pump_status ? 'Running' : 'Stopped';
+                    pumpStatus.className = data.pump_status ? 'badge bg-success' : 'badge bg-danger';
+                    
+                    // If pump is running, start updating the duration from server
+                    if (data.pump_status) {
+                        updatePumpDurationFromServer();
+                        // Start interval to update duration every second
+                        if (!pumpTimerInterval) {
+                            pumpTimerInterval = setInterval(updatePumpDurationFromServer, 1000);
+                        }
+                    } else {
+                        // Stop the timer if pump is not running
+                        if (pumpTimerInterval) {
+                            clearInterval(pumpTimerInterval);
+                            pumpTimerInterval = null;
+                        }
+                        
+                        // Reset the duration display
+                        updateElementText('running-time', null, '0');
+                    }
+                }
+                
+                updateElementText('water-level', data.water_level);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading irrigation status:', error);
+            // Try again after a short delay
+            setTimeout(loadIrrigationStatus, 5000);
+        });
 }
 
-// Report functions - removed setDefaultDates function
+// Function to update pump duration from server
+function updatePumpDurationFromServer() {
+    fetch('/api/irrigation/pump/duration')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Update the running-time element with the duration in seconds
+            updateElementText('running-time', data.seconds || '0', '0');
+        })
+        .catch(error => {
+            console.error('Error updating pump duration:', error);
+            // On error, don't keep trying to fetch duration
+            if (pumpTimerInterval) {
+                clearInterval(pumpTimerInterval);
+                pumpTimerInterval = null;
+                
+                // Try again after a short delay
+                setTimeout(loadIrrigationStatus, 2000);
+            }
+        });
+}
 
-function generateReport() {
-    const reportType = document.getElementById('report-type').value;
+// Function to set up event listeners
+function setupEventListeners() {
+    console.log('Setting up event listeners');
     
-    // Get dates from input fields
-    let startDate = document.getElementById('report-start-date').value;
-    let endDate = document.getElementById('report-end-date').value;
-    
-    // Fix the options collection to match the actual checkbox IDs
-    const options = {};
-    if (reportType === 'weather') {
-        options.temperature = document.getElementById('weather-temperature').checked;
-        options.humidity = document.getElementById('weather-humidity').checked;
-        options.soil_moisture = document.getElementById('weather-soil-moisture').checked;
-        options.wind_speed = document.getElementById('weather-wind-speed').checked;
-        options.pressure = document.getElementById('weather-pressure').checked;
-    } else {
-        options.pump_status = document.getElementById('irrigation-pump-status').checked;
-        options.water_level = document.getElementById('irrigation-water-level').checked;
-        options.duration = document.getElementById('irrigation-duration').checked;
+    // Set up report type change listener
+    const reportTypeSelect = document.getElementById('report-type');
+    if (reportTypeSelect) {
+        reportTypeSelect.addEventListener('change', toggleReportOptions);
     }
     
-    fetch('/api/reports/generate', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            report_type: reportType,
-            start_date: startDate,
-            end_date: endDate,
-            options: options
+    // Set up pump control buttons
+    setupPumpControls();
+    
+    // Set up preset buttons
+    setupPresetButtons();
+}
+
+// Function to set up pump controls
+function setupPumpControls() {
+    const startPumpBtn = document.getElementById('manual-on-btn');
+    const stopPumpBtn = document.getElementById('manual-off-btn');
+    
+    if (startPumpBtn) {
+        startPumpBtn.addEventListener('click', function() {
+            handlePumpAction('start', startPumpBtn, stopPumpBtn);
+        });
+    }
+    
+    if (stopPumpBtn) {
+        stopPumpBtn.addEventListener('click', function() {
+            handlePumpAction('stop', startPumpBtn, stopPumpBtn);
+        });
+    }
+}
+
+// Function to handle pump actions
+function handlePumpAction(action, startBtn, stopBtn) {
+    // Disable buttons during operation
+    if (startBtn) startBtn.disabled = true;
+    if (stopBtn) stopBtn.disabled = true;
+    
+    fetch(`/api/irrigation/pump/${action}`, { method: 'POST' })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
         })
+        .then(data => {
+            console.log(`Pump ${action} response:`, data);
+            showAlert(data.message, data.status);
+            loadIrrigationStatus();
+        })
+        .catch(error => {
+            console.error(`Error ${action}ing pump:`, error);
+            showAlert(`Error ${action}ing pump. Please try again.`, 'danger');
+            
+            // Force refresh irrigation status to get accurate state
+            setTimeout(loadIrrigationStatus, 1000);
+        })
+        .finally(() => {
+            // Re-enable buttons
+            if (startBtn) startBtn.disabled = false;
+            if (stopBtn) stopBtn.disabled = false;
+        });
+}
+
+// Function to set up preset buttons
+function setupPresetButtons() {
+    // Load presets
+    loadPresets();
+    
+    // Add preset button
+    const addPresetBtn = document.getElementById('add-preset-btn');
+    if (addPresetBtn) {
+        addPresetBtn.addEventListener('click', function() {
+            const presetName = document.getElementById('new-preset-name').value;
+            if (!presetName) {
+                showAlert('Please enter a preset name', 'warning');
+                return;
+            }
+            
+            fetch('/api/irrigation/presets', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name: presetName })
+            })
+            .then(response => response.json())
+            .then(data => {
+                showAlert(data.message || `Preset "${presetName}" created`, 'success');
+                loadPresets();
+                document.getElementById('new-preset-name').value = '';
+            })
+            .catch(error => {
+                console.error('Error creating preset:', error);
+                showAlert('Error creating preset', 'danger');
+            });
+        });
+    }
+}
+
+// Function to load presets
+function loadPresets() {
+    const presetsList = document.getElementById('presets-list');
+    if (!presetsList) return;
+    
+    fetch('/api/irrigation/presets')
+        .then(response => response.json())
+        .then(presets => {
+            presetsList.innerHTML = '';
+            
+            if (presets.length === 0) {
+                presetsList.innerHTML = '<div class="list-group-item">No presets available</div>';
+                return;
+            }
+            
+            presets.forEach(preset => {
+                const presetItem = document.createElement('div');
+                presetItem.className = 'list-group-item d-flex justify-content-between align-items-center';
+                
+                const activeClass = preset.active ? 'bg-success text-white' : '';
+                presetItem.classList.add(...activeClass.split(' ').filter(c => c));
+                
+                presetItem.innerHTML = `
+                    <span>${preset.name}</span>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-sm btn-primary activate-preset" data-id="${preset.id}">
+                            Activate
+                        </button>
+                        <button type="button" class="btn btn-sm btn-danger delete-preset" data-id="${preset.id}">
+                            Delete
+                        </button>
+                    </div>
+                `;
+                
+                presetsList.appendChild(presetItem);
+            });
+            
+            // Add event listeners to the new buttons
+            document.querySelectorAll('.activate-preset').forEach(button => {
+                button.addEventListener('click', function() {
+                    const presetId = this.getAttribute('data-id');
+                    activatePreset(presetId);
+                });
+            });
+            
+            document.querySelectorAll('.delete-preset').forEach(button => {
+                button.addEventListener('click', function() {
+                    const presetId = this.getAttribute('data-id');
+                    deletePreset(presetId);
+                });
+            });
+        })
+        .catch(error => {
+            console.error('Error loading presets:', error);
+            presetsList.innerHTML = '<div class="list-group-item text-danger">Error loading presets</div>';
+        });
+}
+
+// Function to activate a preset
+function activatePreset(presetId) {
+    fetch(`/api/irrigation/presets/${presetId}/activate`, {
+        method: 'POST'
     })
     .then(response => response.json())
     .then(data => {
-        displayReport(data, reportType);
+        showAlert(`Preset "${data.name}" activated`, 'success');
+        loadPresets();
+        // Refresh irrigation status as preset may have changed pump state
+        loadIrrigationStatus();
     })
-    .catch(error => console.error('Error generating report:', error));
+    .catch(error => {
+        console.error('Error activating preset:', error);
+        showAlert('Error activating preset', 'danger');
+    });
 }
 
-function displayReport(data, reportType) {
-    const reportDisplay = document.getElementById('report-display');
-    console.log("Report data:", data); // Debug log
-
-    if (!data || data.length === 0) {
-        reportDisplay.innerHTML = '<p class="text-center text-muted">No data available for the selected period</p>';
+// Function to delete a preset
+function deletePreset(presetId) {
+    if (!confirm('Are you sure you want to delete this preset?')) {
         return;
     }
-
-    let tableHTML = `
-        <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead>
-                    <tr>
-                        <th>Date/Time</th>
-    `;
-
-    // Add headers based on report type
-    if (reportType === 'weather') {
-        if (document.getElementById('weather-temperature').checked) tableHTML += '<th>Temperature (°C)</th>';
-        if (document.getElementById('weather-humidity').checked) tableHTML += '<th>Humidity (%)</th>';
-        if (document.getElementById('weather-soil-moisture').checked) tableHTML += '<th>Soil Moisture (%)</th>';
-        if (document.getElementById('weather-wind-speed').checked) tableHTML += '<th>Wind Speed (km/h)</th>';
-        if (document.getElementById('weather-pressure').checked) tableHTML += '<th>Pressure (hPa)</th>';
-    } else {
-        if (document.getElementById('irrigation-pump-status').checked) tableHTML += '<th>Pump Status</th>';
-        if (document.getElementById('irrigation-water-level').checked) tableHTML += '<th>Water Level (%)</th>';
-        if (document.getElementById('irrigation-duration').checked) tableHTML += '<th>Duration (s)</th>';
-    }
-
-    tableHTML += `
-                    </tr>
-                </thead>
-                <tbody>
-    `;
-
-    // Add data rows
-    data.forEach(item => {
-        const timestamp = item.timestamp ? new Date(item.timestamp).toLocaleString() : 'N/A';
-        tableHTML += `<tr><td>${timestamp}</td>`;
-
-        if (reportType === 'weather') {
-            if (document.getElementById('weather-temperature').checked) tableHTML += `<td>${item.temperature || 'N/A'}</td>`;
-            if (document.getElementById('weather-humidity').checked) tableHTML += `<td>${item.humidity || 'N/A'}</td>`;
-            if (document.getElementById('weather-soil-moisture').checked) tableHTML += `<td>${item.soil_moisture || 'N/A'}</td>`;
-            if (document.getElementById('weather-wind-speed').checked) tableHTML += `<td>${item.wind_speed || 'N/A'}</td>`;
-            if (document.getElementById('weather-pressure').checked) tableHTML += `<td>${item.pressure || 'N/A'}</td>`;
-        } else {
-            if (document.getElementById('irrigation-pump-status').checked) tableHTML += `<td>${item.pump_status ? 'Running' : 'Stopped'}</td>`;
-            if (document.getElementById('irrigation-water-level').checked) tableHTML += `<td>${item.water_level || 'N/A'}</td>`;
-            if (document.getElementById('irrigation-duration').checked) tableHTML += `<td>${item.duration || 'N/A'}</td>`;
-        }
-
-        tableHTML += `</tr>`;
+    
+    fetch(`/api/irrigation/presets/${presetId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        showAlert(data.message, 'success');
+        loadPresets();
+    })
+    .catch(error => {
+        console.error('Error deleting preset:', error);
+        showAlert('Error deleting preset', 'danger');
     });
-
-    tableHTML += `
-                </tbody>
-            </table>
-        </div>
-    `;
-
-    reportDisplay.innerHTML = tableHTML;
 }
 
-function downloadReport() {
-    const reportType = document.getElementById('report-type').value;
+// Function to show alerts
+function showAlert(message, type = 'info') {
+    // Create alerts container if it doesn't exist
+    let alertsContainer = document.getElementById('alerts-container');
+    if (!alertsContainer) {
+        alertsContainer = document.createElement('div');
+        alertsContainer.id = 'alerts-container';
+        alertsContainer.style.position = 'fixed';
+        alertsContainer.style.top = '20px';
+        alertsContainer.style.right = '20px';
+        alertsContainer.style.zIndex = '1050';
+        document.body.appendChild(alertsContainer);
+    }
     
-    // Get dates, defaulting to last 7 days if empty
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.role = 'alert';
+    
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    
+    alertsContainer.appendChild(alertDiv);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        alertDiv.classList.remove('show');
+        setTimeout(() => {
+            alertsContainer.removeChild(alertDiv);
+        }, 150);
+    }, 5000);
+}
+
+// Function to toggle report options based on report type
+function toggleReportOptions() {
+    const reportType = document.getElementById('report-type').value;
+    console.log(`Report type changed to: ${reportType}`);
+    
+    // Get option containers
+    const weatherOptions = document.getElementById('weather-options');
+    const irrigationOptions = document.getElementById('irrigation-options');
+    
+    if (!weatherOptions || !irrigationOptions) {
+        console.error('Report option containers not found');
+        return;
+    }
+    
+    // Show/hide based on report type
+    if (reportType === 'weather') {
+        weatherOptions.style.display = 'block';
+        irrigationOptions.style.display = 'none';
+    } else {
+        weatherOptions.style.display = 'none';
+        irrigationOptions.style.display = 'block';
+    }
+    
+    console.log(`Toggled options for ${reportType} report`);
+}
+
+// Function to set default dates if they're empty
+function setDefaultDates() {
     let startDate = document.getElementById('report-start-date').value;
     let endDate = document.getElementById('report-end-date').value;
     
@@ -295,9 +454,46 @@ function downloadReport() {
         }
     }
     
-    // Rest of the function remains the same
+    return { startDate, endDate };
+}
+
+// Function to generate a report
+function generateReport() {
+    const reportType = document.getElementById('report-type').value;
+    
+    // Set default dates if empty
+    const { startDate, endDate } = setDefaultDates();
+    
     // Get selected options
+    const options = getReportOptions(reportType);
+    
+    fetch('/api/reports/generate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            report_type: reportType,
+            start_date: startDate,
+            end_date: endDate,
+            options: options
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Report data:', data);
+        displayReport(data, reportType);
+    })
+    .catch(error => {
+        console.error('Error generating report:', error);
+        showAlert('Error generating report. Please try again.', 'danger');
+    });
+}
+
+// Helper function to get report options
+function getReportOptions(reportType) {
     const options = {};
+    
     if (reportType === 'weather') {
         options.temperature = document.getElementById('weather-temperature').checked;
         options.humidity = document.getElementById('weather-humidity').checked;
@@ -309,6 +505,100 @@ function downloadReport() {
         options.water_level = document.getElementById('irrigation-water-level').checked;
         options.duration = document.getElementById('irrigation-duration').checked;
     }
+    
+    return options;
+}
+
+// Function to display a report
+function displayReport(data, reportType) {
+    const reportDisplay = document.getElementById('report-display');
+    if (!reportDisplay) {
+        console.error('Report display container not found');
+        return;
+    }
+    
+    if (!data || data.length === 0) {
+        reportDisplay.innerHTML = '<div class="alert alert-info">No data available for the selected period.</div>';
+        return;
+    }
+    
+    // Create table headers based on report type and available data
+    let headers = ['Date', 'Time'];
+    
+    // Get the selected options
+    const options = getReportOptions(reportType);
+    
+    if (reportType === 'weather') {
+        // Add weather-specific headers based on selected options
+        if (options.temperature) headers.push('Temperature (°C)');
+        if (options.humidity) headers.push('Humidity (%)');
+        if (options.soil_moisture) headers.push('Soil Moisture (%)');
+        if (options.wind_speed) headers.push('Wind Speed (km/h)');
+        if (options.pressure) headers.push('Pressure (hPa)');
+    } else {
+        // Add irrigation-specific headers based on selected options
+        if (options.pump_status) headers.push('Pump Status');
+        if (options.water_level) headers.push('Water Level (%)');
+        if (options.duration) headers.push('Duration (s)');
+    }
+    
+    // Create table HTML
+    let tableHTML = `
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        ${headers.map(header => `<th>${header}</th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    // Add rows for each data point
+    data.forEach(item => {
+        const timestamp = new Date(item.timestamp);
+        const date = timestamp.toLocaleDateString();
+        const time = timestamp.toLocaleTimeString();
+        
+        tableHTML += '<tr>';
+        tableHTML += `<td>${date}</td>`;
+        tableHTML += `<td>${time}</td>`;
+        
+        if (reportType === 'weather') {
+            // Add weather-specific data based on selected options
+            if (options.temperature) tableHTML += `<td>${item.temperature !== undefined ? item.temperature : '-'}</td>`;
+            if (options.humidity) tableHTML += `<td>${item.humidity !== undefined ? item.humidity : '-'}</td>`;
+            if (options.soil_moisture) tableHTML += `<td>${item.soil_moisture !== undefined ? item.soil_moisture : '-'}</td>`;
+            if (options.wind_speed) tableHTML += `<td>${item.wind_speed !== undefined ? item.wind_speed : '-'}</td>`;
+            if (options.pressure) tableHTML += `<td>${item.pressure !== undefined ? item.pressure : '-'}</td>`;
+        } else {
+            // Add irrigation-specific data based on selected options
+            if (options.pump_status) tableHTML += `<td>${item.pump_status !== undefined ? (item.pump_status ? 'Running' : 'Stopped') : '-'}</td>`;
+            if (options.water_level) tableHTML += `<td>${item.water_level !== undefined ? item.water_level : '-'}</td>`;
+            if (options.duration) tableHTML += `<td>${item.duration !== undefined ? item.duration : '-'}</td>`;
+        }
+        
+        tableHTML += '</tr>';
+    });
+    
+    tableHTML += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    reportDisplay.innerHTML = tableHTML;
+}
+
+// Function to download a report
+function downloadReport() {
+    const reportType = document.getElementById('report-type').value;
+    
+    // Set default dates if empty
+    const { startDate, endDate } = setDefaultDates();
+    
+    // Get selected options
+    const options = getReportOptions(reportType);
     
     // Create URL with parameters
     const url = `/api/reports/download?report_type=${reportType}&start_date=${startDate}&end_date=${endDate}&options=${JSON.stringify(options)}`;
@@ -323,7 +613,7 @@ function downloadReport() {
                 return response.json().then(data => {
                     if (data.status === 'no_data') {
                         // Show popup with the message
-                        alert(data.message);
+                        showAlert(data.message, 'warning');
                         return null;
                     }
                     return data;
@@ -340,127 +630,30 @@ function downloadReport() {
                     a.click();
                     window.URL.revokeObjectURL(url);
                     document.body.removeChild(a);
+                    
+                    showAlert('Report downloaded successfully', 'success');
                 });
                 return null;
             }
         })
         .catch(error => {
             console.error('Error downloading report:', error);
-            alert('An error occurred while downloading the report. Please try again.');
-        });}
-
-
-// Variables to track irrigation
-let irrigationStartTime = null;
-let irrigationTimer = null;
-
-// Function to start manual irrigation
-function startManualIrrigation() {
-    const presetId = getSelectedPresetId();
-    
-    if (!presetId) {
-        showAlert('Please select a preset first', 'warning');
-        return;
-    }
-    
-    // Record the start time
-    irrigationStartTime = Date.now();
-    console.log("Starting irrigation at:", new Date(irrigationStartTime).toISOString());
-    
-    // Start a timer to update the elapsed time display
-    const elapsedTimeDisplay = document.getElementById('elapsed-time');
-    if (elapsedTimeDisplay) {
-        irrigationTimer = setInterval(() => {
-            const elapsedSeconds = Math.floor((Date.now() - irrigationStartTime) / 1000);
-            elapsedTimeDisplay.textContent = formatTime(elapsedSeconds);
-        }, 1000);
-    }
-    
-    // Send the start command to the server
-    fetch('/api/irrigation/manual', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            action: 'start',
-            preset_id: presetId
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            // Update UI to show irrigation is running
-            document.getElementById('start-irrigation').disabled = true;
-            document.getElementById('stop-irrigation').disabled = false;
-            showAlert('Irrigation started', 'success');
-        } else {
-            showAlert(data.message || 'Failed to start irrigation', 'danger');
-        }
-    })
-    .catch(error => {
-        console.error('Error starting irrigation:', error);
-        showAlert('Error starting irrigation', 'danger');
-    });
+            showAlert('Error downloading report. Please try again.', 'danger');
+        });
 }
 
-// Function to stop manual irrigation
-function stopManualIrrigation() {
-    // Calculate elapsed time
-    let elapsedTime = 0;
-    if (irrigationStartTime) {
-        elapsedTime = (Date.now() - irrigationStartTime) / 1000; // Convert to seconds
-        console.log("Stopping irrigation after:", elapsedTime, "seconds");
+// Function to clear the report display
+function clearReports() {
+    const reportDisplay = document.getElementById('report-display');
+    if (reportDisplay) {
+        reportDisplay.innerHTML = '';
+        console.log('Reports cleared');
+        showAlert('Report display cleared', 'info');
     }
-    
-    // Clear the timer
-    if (irrigationTimer) {
-        clearInterval(irrigationTimer);
-        irrigationTimer = null;
-    }
-    
-    // Reset start time
-    irrigationStartTime = null;
-    
-    const presetId = getSelectedPresetId();
-    
-    // Send the stop command to the server with the elapsed time
-    fetch('/api/irrigation/manual', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            action: 'stop',
-            preset_id: presetId,
-            elapsed_time: elapsedTime
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            // Update UI to show irrigation is stopped
-            document.getElementById('start-irrigation').disabled = false;
-            document.getElementById('stop-irrigation').disabled = true;
-            document.getElementById('elapsed-time').textContent = '00:00:00';
-            showAlert('Irrigation stopped', 'success');
-        } else {
-            showAlert(data.message || 'Failed to stop irrigation', 'danger');
-        }
-    })
-    .catch(error => {
-        console.error('Error stopping irrigation:', error);
-        showAlert('Error stopping irrigation', 'danger');
-    });
 }
 
-// Helper function to format time as HH:MM:SS
-function formatTime(seconds) {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    return [hours, minutes, secs]
-        .map(v => v < 10 ? "0" + v : v)
-        .join(":");
-}
+// Make functions available globally
+window.generateReport = generateReport;
+window.downloadReport = downloadReport;
+window.clearReports = clearReports;
+window.toggleReportOptions = toggleReportOptions;

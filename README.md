@@ -8,6 +8,9 @@ A web-based irrigation system with weather monitoring capabilities.
 - Irrigation scheduling
 - Preset management
 - Report generation
+- Pump control with duration tracking
+- Water level monitoring
+- Customizable data reports with filtering options
 
 ## Setup
 
@@ -22,6 +25,7 @@ A web-based irrigation system with weather monitoring capabilities.
 - `shared/` - Shared utilities and components
 - `irrigation/` - Irrigation system functionality
 - `weather/` - Weather monitoring functionality
+- `reports/` - Report generation functionality
 - `static/` - Static files (CSS, JavaScript)
 - `templates/` - HTML templates
 - `instance/` - Instance-specific files (database)
@@ -30,6 +34,7 @@ A web-based irrigation system with weather monitoring capabilities.
 
 ### Irrigation
 
+- `GET /api/irrigation/status` - Get current irrigation system status
 - `GET /api/irrigation/presets` - Get all presets
 - `GET /api/irrigation/preset/<id>` - Get preset details
 - `POST /api/irrigation/preset` - Create a new preset
@@ -40,6 +45,7 @@ A web-based irrigation system with weather monitoring capabilities.
 - `DELETE /api/irrigation/schedule/<id>` - Delete a schedule
 - `POST /api/irrigation/pump/start` - Start the pump
 - `POST /api/irrigation/pump/stop` - Stop the pump
+- `GET /api/irrigation/pump/duration` - Get current pump duration
 
 ### Weather
 
@@ -51,6 +57,43 @@ A web-based irrigation system with weather monitoring capabilities.
 - `POST /api/reports/generate` - Generate a report
 - `GET /api/reports/download` - Download a report as CSV
 
+## Dependencies
+
+The project requires the following Python packages:
+- Flask 2.3.3
+- Flask-SQLAlchemy 3.1.1
+- Flask-SocketIO 5.3.6
+- python-socketio 5.10.0
+- python-engineio 4.8.0
+- eventlet 0.33.3
+
+## WebSocket Events
+
+The application uses WebSockets for real-time updates:
+- `weather_update` - Sent when new weather data is available
+- `preset_activated` - Sent when an irrigation preset is activated
+- `pump_status_change` - Sent when the pump status changes
+
+## Resolved Issues
+
+The following issues have been fixed:
+
+1. Pump Control:
+   - ✅ Fixed pump duration tracking and display
+   - ✅ Resolved type mismatch error when stopping the pump
+   - ✅ Pump duration now correctly recorded in the database
+
+2. Report Generation:
+   - ✅ Report options now properly filter displayed data
+   - ✅ Clear button for reports is now functioning
+
+3. Date Selection:
+   - ✅ Default dates for reports now display properly
+
+4. Report Filtering:
+   - ✅ Report data now only shows selected columns
+   - ✅ Downloaded CSV reports only include selected data columns
+
 ## Known Issues
 
 The following issues are currently being addressed:
@@ -59,20 +102,14 @@ The following issues are currently being addressed:
    - Cannot create or load irrigation presets
    - No way to select and activate a preset while deactivating others
 
-2. Report Generation:
-   - Report column options don't change with the selected report type
-   - Clear button for reports is not functioning
-   
-3. Date Selection:
-   - Default dates for reports are not displaying properly
 
 ## Potential Issues
 
 These are additional concerns that may need attention:
 
 1. Timer Functionality:
-   - Running time counter may reset unexpectedly
-   - Elapsed time display for manual irrigation needs improvement
+   - Running time counter may reset unexpectedly when browser refreshes
+   - No persistent storage of pump running time across server restarts
 
 2. Error Handling:
    - Insufficient error handling for API requests
@@ -81,3 +118,29 @@ These are additional concerns that may need attention:
 3. UI/UX Issues:
    - Inconsistent responsive design on smaller screens
    - Limited accessibility features
+
+4. Database Management:
+   - No data pruning mechanism for old logs
+   - Potential performance issues with large datasets
+
+5. Security Concerns:
+   - No authentication system for controlling pump
+   - API endpoints lack proper validation
+
+## Development
+
+### Adding New Features
+
+1. Create appropriate models in the relevant module
+2. Add controller functions to handle business logic
+3. Create routes to expose API endpoints
+4. Update the frontend JavaScript to interact with new endpoints
+5. Add WebSocket events if real-time updates are needed
+
+### Database Schema
+
+The application uses SQLAlchemy with the following main models:
+- `WeatherData` - Stores weather sensor readings
+- `IrrigationPreset` - Stores irrigation configuration presets
+- `PumpLog` - Records pump start/stop events
+- `IrrigationLog` - Records detailed irrigation events
