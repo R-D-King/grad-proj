@@ -385,7 +385,7 @@ function loadPresets() {
     const presetsList = document.getElementById('presets-list');
     if (!presetsList) return;
     
-    fetch('/api/irrigation/presets')
+    fetch('/api/irrigation/presets')  // This should match the backend route
         .then(response => response.json())
         .then(presets => {
             presetsList.innerHTML = '';
@@ -440,7 +440,7 @@ function loadPresets() {
 
 // Function to activate a preset
 function activatePreset(presetId) {
-    fetch(`/api/irrigation/presets/${presetId}/activate`, {
+    fetch(`/api/irrigation/preset/${presetId}/activate`, {  // Update to match backend route
         method: 'POST'
     })
     .then(response => response.json())
@@ -462,7 +462,7 @@ function deletePreset(presetId) {
         return;
     }
     
-    fetch(`/api/irrigation/presets/${presetId}`, {
+    fetch(`/api/irrigation/preset/${presetId}`, {  // Update to match backend route
         method: 'DELETE'
     })
     .then(response => response.json())

@@ -30,8 +30,18 @@ def stop_pump():
 @irrigation_bp.route('/api/irrigation/presets', methods=['GET'])
 def get_presets():
     """Get all irrigation presets."""
-    from .controllers import get_all_presets
-    return jsonify(get_all_presets())
+    from .controllers import get_presets
+    return jsonify(get_presets())
+
+# Make sure this route exists and matches the frontend call
+@irrigation_bp.route('/api/irrigation/preset/<int:preset_id>', methods=['GET'])
+def get_preset(preset_id):
+    """Get a specific irrigation preset."""
+    from .controllers import get_preset
+    preset = get_preset(preset_id)
+    if preset:
+        return jsonify(preset)
+    return jsonify({"error": "Preset not found"}), 404
 
 @irrigation_bp.route('/api/irrigation/presets', methods=['POST'])
 def create_preset():
