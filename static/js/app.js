@@ -101,6 +101,28 @@ function updateElementText(elementId, value, fallback = '--') {
     }
 }
 
+// Helper function to update element class
+function updateElementClass(elementId, newClass, fallbackClass = '') {
+    const element = document.getElementById(elementId);
+    if (element) {
+        // Remove all existing classes that might conflict
+        element.className = '';
+        // Add the new class if it exists, otherwise add fallback
+        element.className = newClass || fallbackClass;
+    }
+}
+
+// Helper function to get water level class based on percentage
+function getWaterLevelClass(level) {
+    if (level === undefined || level === null) return 'text-warning';
+    const numLevel = Number(level);
+    if (isNaN(numLevel)) return 'text-warning';
+    
+    if (numLevel <= 20) return 'text-danger';
+    if (numLevel <= 40) return 'text-warning';
+    return 'text-success';
+}
+
 // Global variables for pump timer
 let pumpTimerInterval = null;
 
@@ -109,37 +131,78 @@ function loadIrrigationStatus() {
     fetch('/api/irrigation/status')
         .then(response => response.json())
         .then(data => {
-            if (data) {
-                const pumpStatus = document.getElementById('pump-status');
-                if (pumpStatus) {
-                    pumpStatus.textContent = data.pump_status ? 'Running' : 'Stopped';
-                    pumpStatus.className = data.pump_status ? 'badge bg-success' : 'badge bg-danger';
-                    
-                    // If pump is running, start updating the duration from server
-                    if (data.pump_status) {
-                        updatePumpDurationFromServer();
-                        // Start interval to update duration every second
-                        if (!pumpTimerInterval) {
-                            pumpTimerInterval = setInterval(updatePumpDurationFromServer, 1000);
-                        }
-                    } else {
-                        // Stop the timer if pump is not running
-                        if (pumpTimerInterval) {
-                            clearInterval(pumpTimerInterval);
-                            pumpTimerInterval = null;
-                        }
-                        
-                        // Reset the duration display
-                        updateElementText('running-time', null, '0');
-                    }
+            // Update pump status
+            const pumpStatus = data.pump_status;
+            
+            // Update the pumpRunning variable
+            if (typeof pumpStatus === 'object' && pumpStatus !== null) {
+                pumpRunning = pumpStatus.running || false;
+                
+                if (!pumpRunning) {
+                    lastPumpStopTime = Date.now();
                 }
                 
-                updateElementText('water-level', data.water_level);
+                // Update UI elements
+                const pumpStatusElement = document.getElementById('pump-status');
+                if (pumpStatusElement) {
+                    pumpStatusElement.textContent = pumpStatus.running ? 'Running' : 'Stopped';
+                    pumpStatusElement.className = pumpStatus.running ? 'badge bg-success' : 'badge bg-danger';
+                }
+            } else {
+                // Legacy support for boolean pump status
+                pumpRunning = !!pumpStatus;
+                
+                if (!pumpRunning) {
+                    lastPumpStopTime = Date.now();
+                }
+                
+                // Update UI elements
+                const pumpStatusElement = document.getElementById('pump-status');
+                if (pumpStatusElement) {
+                    pumpStatusElement.textContent = pumpStatus ? 'Running' : 'Stopped';
+                    pumpStatusElement.className = pumpStatus ? 'badge bg-success' : 'badge bg-danger';
+                }
+            }
+            
+            // Update water level
+            const waterLevel = data.water_level;
+            if (waterLevel) {
+                // Fix: Check if waterLevel is an object with a level property
+                if (typeof waterLevel === 'object' && waterLevel.level !== undefined) {
+                    // Remove any existing % sign before adding one
+                    const levelValue = Math.round(waterLevel.level);
+                    updateElementText('water-level', `${levelValue}%`, 'Unknown');
+                } else {
+                    // Handle case where waterLevel is a direct number value
+                    const levelValue = Math.round(waterLevel);
+                    updateElementText('water-level', `${levelValue}%`, 'Unknown');
+                }
+            }
+            
+            // Start or stop the pump duration timer based on pump status
+            if (pumpRunning) {
+                updatePumpDurationFromServer();
+                // Start interval to update duration every second if not already running
+                if (!pumpTimerInterval) {
+                    pumpTimerInterval = setInterval(updatePumpDurationFromServer, 1000);
+                }
+            } else {
+                // Stop the timer if pump is not running, but wait a moment to get final duration
+                if (pumpTimerInterval) {
+                    // Get one final update to ensure we have the latest duration
+                    updatePumpDurationFromServer();
+                    
+                    // Then stop the timer after a short delay
+                    setTimeout(() => {
+                        clearInterval(pumpTimerInterval);
+                        pumpTimerInterval = null;
+                    }, 2000);
+                }
             }
         })
         .catch(error => {
             console.error('Error loading irrigation status:', error);
-            // Try again after a short delay
+            // Try again after a delay
             setTimeout(loadIrrigationStatus, 5000);
         });
 }
@@ -155,19 +218,63 @@ function updatePumpDurationFromServer() {
         })
         .then(data => {
             // Update the running-time element with the duration in seconds
-            updateElementText('running-time', data.seconds || '0', '0');
+            const runningTimeElement = document.getElementById('running-time');
+            if (runningTimeElement) {
+                // Convert to integer by using Math.floor
+                const seconds = Math.floor(data.seconds || 0);
+                runningTimeElement.textContent = seconds;
+            }
         })
         .catch(error => {
             console.error('Error updating pump duration:', error);
-            // On error, don't keep trying to fetch duration
-            if (pumpTimerInterval) {
-                clearInterval(pumpTimerInterval);
-                pumpTimerInterval = null;
-                
-                // Try again after a short delay
-                setTimeout(loadIrrigationStatus, 2000);
-            }
         });
+}
+
+// Function to handle pump actions
+function handlePumpAction(action, startBtn, stopBtn) {
+    // Disable buttons during operation
+    if (startBtn) startBtn.disabled = true;
+    if (stopBtn) stopBtn.disabled = true;
+    
+    fetch(`/api/irrigation/pump/${action}`, { 
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log(`Pump ${action} response:`, data);
+        
+        // Update pump status based on action
+        if (action === 'start' && data.status === 'success') {
+            pumpRunning = true;
+        } else if (action === 'stop' && data.status === 'success') {
+            pumpRunning = false;
+            lastPumpStopTime = Date.now();
+        }
+        
+        // Show alert with proper styling
+        showAlert(data.message, data.status === 'success' ? 'success' : 
+                             data.status === 'warning' ? 'warning' : 'danger');
+        
+        // Refresh irrigation status
+        loadIrrigationStatus();
+    })
+    .catch(error => {
+        console.error(`Error ${action}ing pump:`, error);
+        showAlert(`Error ${action}ing pump. Please try again.`, 'danger');
+    })
+    .finally(() => {
+        // Re-enable buttons
+        if (startBtn) startBtn.disabled = false;
+        if (stopBtn) stopBtn.disabled = false;
+    });
 }
 
 // Function to set up event listeners

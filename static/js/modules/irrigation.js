@@ -37,7 +37,7 @@ function updateRunningTimeDisplay() {
         // Format the time as HH:MM:SS
         const hours = Math.floor(runningTime / 3600);
         const minutes = Math.floor((runningTime % 3600) / 60);
-        const seconds = runningTime % 60;
+        const seconds = Math.floor(runningTime % 60);  // Changed to Math.floor
         
         const formattedTime = [
             hours.toString().padStart(2, '0'),

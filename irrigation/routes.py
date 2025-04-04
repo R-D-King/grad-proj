@@ -72,3 +72,11 @@ def get_pump_duration():
         'seconds': duration_seconds,
         'formatted': formatted_time
     })
+
+@irrigation_bp.route('/api/irrigation/pump/run', methods=['POST'])
+def run_pump_for_duration_route():
+    """Run the pump for a specific duration."""
+    from .controllers import run_pump_for_duration
+    data = request.json
+    duration = data.get('duration', 0)
+    return jsonify(run_pump_for_duration(duration))

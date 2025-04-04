@@ -23,11 +23,30 @@ A web-based irrigation system with weather monitoring capabilities.
 
 - `app.py` - Main application file
 - `shared/` - Shared utilities and components
+  - `database.py` - Database configuration
+  - `config.py` - Application configuration
+  - `socketio.py` - WebSocket setup
+  - `utils.py` - Utility functions
 - `irrigation/` - Irrigation system functionality
+  - `controllers.py` - Pump and water level control
+  - `models.py` - Database models for irrigation
+  - `routes.py` - API endpoints for irrigation
 - `weather/` - Weather monitoring functionality
+  - `controllers.py` - Weather data processing
+  - `models.py` - Database models for weather data
+  - `routes.py` - API endpoints for weather
 - `reports/` - Report generation functionality
+  - `controllers.py` - Report generation logic
+  - `routes.py` - API endpoints for reports
 - `static/` - Static files (CSS, JavaScript)
+  - `js/` - JavaScript files
+  - `css/` - CSS stylesheets
 - `templates/` - HTML templates
+  - `index.html` - Main application interface
+- `hardware/` - Hardware interface modules
+  - `relay.py` - Relay control for pump
+  - `water_level.py` - Water level sensor interface
+  - `pump.py` - Pump control logic
 - `instance/` - Instance-specific files (database)
 
 ## API Endpoints
@@ -66,6 +85,10 @@ The project requires the following Python packages:
 - python-socketio 5.10.0
 - python-engineio 4.8.0
 - eventlet 0.33.3
+- Werkzeug 2.3.7
+- Jinja2 3.1.2
+- SQLAlchemy 2.0.21
+- python-dateutil 2.8.2
 
 ## WebSocket Events
 
@@ -94,6 +117,10 @@ The following issues have been fixed:
    - ✅ Report data now only shows selected columns
    - ✅ Downloaded CSV reports only include selected data columns
 
+5. UI Display:
+   - ✅ Fixed water level display showing duplicate percentage signs
+   - ✅ Running time counter now displays integer values without decimal places
+
 ## Known Issues
 
 The following issues are currently being addressed:
@@ -101,7 +128,6 @@ The following issues are currently being addressed:
 1. Preset Management:
    - Cannot create or load irrigation presets
    - No way to select and activate a preset while deactivating others
-
 
 ## Potential Issues
 
@@ -141,6 +167,7 @@ These are additional concerns that may need attention:
 
 The application uses SQLAlchemy with the following main models:
 - `WeatherData` - Stores weather sensor readings
-- `IrrigationPreset` - Stores irrigation configuration presets
+- `Preset` - Stores irrigation configuration presets
+- `Schedule` - Stores scheduled irrigation times
 - `PumpLog` - Records pump start/stop events
 - `IrrigationLog` - Records detailed irrigation events
