@@ -74,6 +74,33 @@ def calculate_water_used(duration):
     flow_rate = 2.0 / 60.0  # liters per second
     return duration * flow_rate if duration else 0
 
+def activate_preset(preset_id):
+    """Activate a specific irrigation preset."""
+    try:
+        # Get the preset from database
+        preset = Preset.query.get(preset_id)
+        if not preset:
+            return {"status": "error", "message": "Preset not found"}
+
+        # Update all presets to inactive
+        Preset.query.update({"active": False})
+        # Set the selected preset as active
+        preset.active = True
+        db.session.commit()
+
+        # Start the pump with preset settings
+        result = start_pump(preset_id=preset_id)
+        
+        return {
+            "status": "success",
+            "message": f"Preset '{preset.name}' activated",
+            "name": preset.name,
+            "pump_status": result
+        }
+    except Exception as e:
+        logger.error(f"Error activating preset {preset_id}: {str(e)}")
+        return {"status": "error", "message": f"Error activating preset: {str(e)}"}
+
 def start_pump(preset_id=None):
     """Start the irrigation pump."""
     global pump_running, pump_start_time

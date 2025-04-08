@@ -33,8 +33,8 @@ def get_presets():
     from .controllers import get_presets
     return jsonify(get_presets())
 
-# Make sure this route exists and matches the frontend call
-@irrigation_bp.route('/api/irrigation/preset/<int:preset_id>', methods=['GET'])
+# Change this route to match the frontend call (plural 'presets' instead of singular 'preset')
+@irrigation_bp.route('/api/irrigation/presets/<int:preset_id>', methods=['GET'])
 def get_preset(preset_id):
     """Get a specific irrigation preset."""
     from .controllers import get_preset
@@ -51,16 +51,33 @@ def create_preset():
     result = controller_create_preset(data)
     return jsonify(result)
 
+# Keep your existing delete route with plural 'presets'
 @irrigation_bp.route('/api/irrigation/presets/<int:preset_id>', methods=['DELETE'])
 def delete_preset_route(preset_id):
     """Delete a preset."""
     from .controllers import delete_preset
     return jsonify(delete_preset(preset_id))
 
+# Add a new route that handles the singular 'preset' form for backward compatibility
+@irrigation_bp.route('/api/irrigation/preset/<int:preset_id>', methods=['DELETE'])
+def delete_preset_singular_route(preset_id):
+    """Delete a preset (singular route for backward compatibility)."""
+    from .controllers import delete_preset
+    return jsonify(delete_preset(preset_id))
+
 # Fix the duplicate endpoint function name by renaming this function
+# Change this route to use plural 'presets' instead of singular 'preset'
+# Update the existing activate route to use plural 'presets'
 @irrigation_bp.route('/api/irrigation/presets/<int:preset_id>/activate', methods=['POST'])
-def activate_preset_endpoint(preset_id):  # Changed from activate_preset_route
+def activate_preset_endpoint(preset_id):
     """Activate a specific preset."""
+    from .controllers import activate_preset
+    return jsonify(activate_preset(preset_id))
+
+# Add a backward compatibility route for the singular form
+@irrigation_bp.route('/api/irrigation/preset/<int:preset_id>/activate', methods=['POST'])
+def activate_preset_singular_endpoint(preset_id):
+    """Activate a specific preset (singular route for backward compatibility)."""
     from .controllers import activate_preset
     return jsonify(activate_preset(preset_id))
 
@@ -90,3 +107,23 @@ def run_pump_for_duration_route():
     data = request.json
     duration = data.get('duration', 0)
     return jsonify(run_pump_for_duration(duration))
+
+@irrigation_bp.route('/api/irrigation/schedule', methods=['POST'])
+def create_schedule():
+    """Create a new irrigation schedule."""
+    from .controllers import create_schedule as controller_create_schedule
+    data = request.json
+    return jsonify(controller_create_schedule(data))
+
+@irrigation_bp.route('/api/irrigation/schedule/<int:schedule_id>', methods=['PUT'])
+def update_schedule(schedule_id):
+    """Update an existing schedule."""
+    from .controllers import update_schedule as controller_update_schedule
+    data = request.json
+    return jsonify(controller_update_schedule(schedule_id, data))
+
+@irrigation_bp.route('/api/irrigation/schedule/<int:schedule_id>', methods=['DELETE'])
+def delete_schedule(schedule_id):
+    """Delete a schedule."""
+    from .controllers import delete_schedule
+    return jsonify(delete_schedule(schedule_id))

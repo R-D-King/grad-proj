@@ -382,61 +382,94 @@ function setupPresetButtons() {
 
 // Function to load presets
 function loadPresets() {
-    const presetsList = document.getElementById('presets-list');
+    const presetsList = document.getElementById('presetsList');
     if (!presetsList) return;
     
-    fetch('/api/irrigation/presets')  // This should match the backend route
+    fetch('/api/irrigation/presets')
         .then(response => response.json())
         .then(presets => {
             presetsList.innerHTML = '';
             
             if (presets.length === 0) {
-                presetsList.innerHTML = '<div class="list-group-item">No presets available</div>';
+                presetsList.innerHTML = '<div class="col-12 text-center"><p class="text-muted">No presets available</p></div>';
                 return;
             }
             
             presets.forEach(preset => {
-                const presetItem = document.createElement('div');
-                presetItem.className = 'list-group-item d-flex justify-content-between align-items-center';
+                const presetCol = document.createElement('div');
+                presetCol.className = 'col-md-6 col-lg-4 mb-3';
                 
-                const activeClass = preset.active ? 'bg-success text-white' : '';
-                presetItem.classList.add(...activeClass.split(' ').filter(c => c));
+                const activeClass = preset.active ? 'active' : '';
                 
-                presetItem.innerHTML = `
-                    <span>${preset.name}</span>
-                    <div class="btn-group" role="group">
-                        <button type="button" class="btn btn-sm btn-primary activate-preset" data-id="${preset.id}">
-                            Activate
-                        </button>
-                        <button type="button" class="btn btn-sm btn-danger delete-preset" data-id="${preset.id}">
-                            Delete
-                        </button>
+                presetCol.innerHTML = `
+                    <div class="card preset-card ${activeClass}" data-preset-id="${preset.id}">
+                        <div class="card-body">
+                            <h5 class="card-title">${preset.name}</h5>
+                            <p class="card-text mb-2">
+                                <i class="fas fa-clock me-2"></i>
+                                <span class="text-muted">Duration:</span> ${preset.duration || 0}s
+                            </p>
+                            <p class="card-text">
+                                <i class="fas fa-water me-2"></i>
+                                <span class="text-muted">Water Level:</span> ${preset.water_level || 0}%
+                            </p>
+                        </div>
+                        <div class="card-footer bg-transparent border-top-0 d-flex justify-content-between">
+                            <button class="btn btn-sm btn-outline-primary activate-preset" data-preset-id="${preset.id}">
+                                <i class="fas fa-play me-1"></i> Activate
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger delete-preset" data-preset-id="${preset.id}">
+                                <i class="fas fa-trash me-1"></i>
+                            </button>
+                        </div>
                     </div>
                 `;
                 
-                presetsList.appendChild(presetItem);
+                presetsList.appendChild(presetCol);
+                
+                // Add click event to the entire card
+                const card = presetCol.querySelector('.preset-card');
+                card.addEventListener('click', function(e) {
+                    // Don't activate if clicking buttons
+                    if (e.target.closest('button')) return;
+                    
+                    const presetId = this.dataset.presetId;
+                    // Remove active class from all cards
+                    document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('active'));
+                    // Add active class to clicked card
+                    this.classList.add('active');
+                    // Activate the preset
+                    activatePreset(presetId);
+                });
             });
             
-            // Add event listeners to the new buttons
+            // Add event listeners to buttons
             document.querySelectorAll('.activate-preset').forEach(button => {
-                button.addEventListener('click', function() {
-                    const presetId = this.getAttribute('data-id');
+                button.addEventListener('click', function(e) {
+                    e.stopPropagation(); // Prevent card click
+                    const presetId = this.dataset.presetId;
+                    // Remove active class from all cards
+                    document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('active'));
+                    // Add active class to parent card
+                    this.closest('.preset-card').classList.add('active');
                     activatePreset(presetId);
                 });
             });
             
             document.querySelectorAll('.delete-preset').forEach(button => {
-                button.addEventListener('click', function() {
-                    const presetId = this.getAttribute('data-id');
+                button.addEventListener('click', function(e) {
+                    e.stopPropagation(); // Prevent card click
+                    const presetId = this.dataset.presetId;
                     deletePreset(presetId);
                 });
             });
         })
         .catch(error => {
             console.error('Error loading presets:', error);
-            presetsList.innerHTML = '<div class="list-group-item text-danger">Error loading presets</div>';
+            presetsList.innerHTML = '<div class="col-12 text-center"><p class="text-danger">Error loading presets</p></div>';
         });
 }
+
 
 // Function to activate a preset
 function activatePreset(presetId) {

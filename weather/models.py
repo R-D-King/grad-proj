@@ -5,7 +5,7 @@ class WeatherData(db.Model):
     __tablename__ = 'weather_data'
     
     id = db.Column(db.Integer, primary_key=True)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, default=datetime.now)
     temperature = db.Column(db.Float, nullable=False)
     humidity = db.Column(db.Float, nullable=False)
     soil_moisture = db.Column(db.Float, nullable=False)
