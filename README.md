@@ -11,13 +11,39 @@ A web-based irrigation system with weather monitoring capabilities.
 - Pump control with duration tracking
 - Water level monitoring
 - Customizable data reports with filtering options
+- Temperature and humidity monitoring with DHT22 sensor
+- Soil moisture monitoring with capacitive soil moisture sensor
 
 ## Setup
 
+### Standard Setup
 1. Make sure you have Python 3.8+ installed
 2. Run the setup script: ```python setup.py```
-3. Start the application: ```python app.py```
-4. Open your browser and navigate to `http://localhost:5000`
+3. Activate the virtual environment:
+   - Windows: ```venv\Scripts\activate```
+   - Linux/Mac: ```source venv/bin/activate```
+4. Start the application: ```python app.py```
+5. Open your browser and navigate to `http://localhost:5000`
+
+### Raspberry Pi Setup
+1. Make sure you have Python 3.8+ installed on your Raspberry Pi
+2. Connect the sensors:
+   - DHT22 temperature/humidity sensor to GPIO pin 4
+   - Soil moisture sensor to SPI interface (MCP3008 ADC on channel 0)
+   - Water level sensor to GPIO pin 17
+3. Run the setup script: ```python setup.py```
+4. Activate the virtual environment: ```source venv/bin/activate```
+5. Start the application: ```python app.py```
+6. Access the web interface by navigating to your Raspberry Pi's IP address on port 5000
+
+## Hardware Requirements
+
+- Raspberry Pi (3B+ or 4 recommended)
+- DHT22 temperature and humidity sensor
+- Capacitive soil moisture sensor
+- MCP3008 analog-to-digital converter (for soil moisture sensor)
+- Water level sensor
+- Relay module for pump control
 
 ## Project Structure
 
@@ -47,7 +73,12 @@ A web-based irrigation system with weather monitoring capabilities.
   - `relay.py` - Relay control for pump
   - `water_level.py` - Water level sensor interface
   - `pump.py` - Pump control logic
+  - `soil_moisture.py` - Soil moisture sensor interface
+  - `dht22.py` - DHT22 temperature and humidity sensor interface
+  - `sensor_controller.py` - Unified sensor management
+  - `sensor_simulation.py` - Sensor simulation for development
 - `instance/` - Instance-specific files (database)
+- `venv/` - Virtual environment (created by setup.py)
 
 ## API Endpoints
 
@@ -89,6 +120,11 @@ The project requires the following Python packages:
 - Jinja2 3.1.2
 - SQLAlchemy 2.0.21
 - python-dateutil 2.8.2
+
+For Raspberry Pi, additional packages are required:
+- RPi.GPIO (for GPIO control)
+- spidev (for SPI communication)
+- adafruit-circuitpython-dht (for DHT22 sensor)
 
 ## WebSocket Events
 
@@ -171,3 +207,43 @@ The application uses SQLAlchemy with the following main models:
 - `Schedule` - Stores scheduled irrigation times
 - `PumpLog` - Records pump start/stop events
 - `IrrigationLog` - Records detailed irrigation events
+
+### Sensor Calibration
+
+The soil moisture sensor may need calibration for your specific soil type:
+1. Place the sensor in completely dry soil and note the reading
+2. Place the sensor in saturated soil and note the reading
+3. Update the `DRY_VALUE` and `WET_VALUE` constants in `hardware/soil_moisture.py`
+
+# Configuration
+
+The application can be configured using JSON configuration files in the `config` directory and environment variables for key operational parameters.
+
+## Environment Variables
+
+The following environment variables can be used to override configuration settings:
+
+- `UI_UPDATE_INTERVAL`: How often sensor readings are sent to the UI (in seconds, default: 1)
+- `DB_UPDATE_INTERVAL`: How often sensor readings are stored in the database (in seconds, default: 60)
+- `SENSOR_SIMULATION`: Whether to use simulated sensors instead of hardware (true/false, default: false)
+- `PORT`: The port to run the server on (default: 5000)
+- `DEBUG`: Whether to run the server in debug mode (true/false, default: false)
+- `DATA_RETENTION_DAYS`: How many days of data to keep before pruning (default: 30)
+- `DATA_RETENTION_ENABLED`: Whether to enable automatic data pruning (true/false, default: true)
+
+Example of setting configuration on Windows:
+```cmd
+set UI_UPDATE_INTERVAL=2
+set DB_UPDATE_INTERVAL=120
+set SENSOR_SIMULATION=true
+
+python app.py
+```
+
+Example of setting configuration on Linux/Mac:
+```bash
+export UI_UPDATE_INTERVAL=2
+export DB_UPDATE_INTERVAL=120
+
+python app.py
+```

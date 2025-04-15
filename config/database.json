@@ -1,0 +1,15 @@
+{
+  "main": {
+    "uri": "sqlite:///instance/irrigation.db"
+  },
+  "archive": {
+    "enabled": true,
+    "path": "instance/archives",
+    "rotation": "monthly"
+  },
+  "retention": {
+    "enabled": true,
+    "max_days": 30,
+    "max_records": 10000
+  }
+}

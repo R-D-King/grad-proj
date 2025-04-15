@@ -8,61 +8,33 @@ from shared.database import db
 from shared.socketio import socketio
 import os
 import logging
+from shared.config import Config
+from shared.routes import shared_bp
+from irrigation.routes import irrigation_bp
+from weather.routes import weather_bp
+from reports.routes import reports_bp
 
-def create_app():
-    app = Flask(__name__, instance_relative_config=True)
+# Set default configuration values for key operational parameters
+os.environ.setdefault('UI_UPDATE_INTERVAL', '1')  # 1 second default
+os.environ.setdefault('DB_UPDATE_INTERVAL', '60')  # 60 seconds default
+
+def create_app(config_class=Config):
+    # Initialize configuration
+    config = config_class()
     
-    # Configure logging to skip certain requests
-    class NoTimeRequestsFilter(logging.Filter):
-        def filter(self, record):
-            # Only check request path when in a request context
-            if has_request_context():
-                # Skip logging for server-time, favicon, and pump duration requests
-                if (request.path == '/api/server-time/display' or 
-                    request.path == '/favicon.ico' or
-                    request.path == '/api/irrigation/pump/duration'):
-                    return False
-                # Skip socket.io polling requests
-                if request.path.startswith('/socket.io'):
-                    return False
-            # Filter out eventlet and wsgi startup messages
-            if 'wsgi starting up on' in getattr(record, 'msg', ''):
-                return False
-            if '(accepted' in getattr(record, 'msg', ''):
-                return False
-            return True
-            
-    # Apply filter to Werkzeug logger
-    logging.getLogger('werkzeug').addFilter(NoTimeRequestsFilter())
-    
-    # Ensure the instance folder exists
-    try:
-        os.makedirs(app.instance_path)
-    except OSError:
-        pass
-    
-    # Configuration
-    app.config['SECRET_KEY'] = 'your-secret-key'
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(app.instance_path, 'app.db')
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    # Create Flask app
+    app = Flask(__name__)
+    app.config.from_object(config)
     
     # Initialize extensions
     db.init_app(app)
-    socketio.init_app(app, logger=False, engineio_logger=False)  # Disable socketio logging
-    
-    # Import blueprints
-    from shared.routes import shared_bp
-    
-    # Instead, ensure we're using:
-    from irrigation.routes import irrigation_bp
-    from reports.routes import reports_bp
-    from weather.routes import weather_bp
+    socketio.init_app(app)
     
     # Register blueprints
     app.register_blueprint(shared_bp)
-    app.register_blueprint(reports_bp)
     app.register_blueprint(irrigation_bp)
     app.register_blueprint(weather_bp)
+    app.register_blueprint(reports_bp)
     
     # Create database tables
     with app.app_context():
@@ -72,9 +44,25 @@ def create_app():
     def index():
         return render_template('index.html')
     
+    # Initialize weather controller with app context
+    from weather.controllers import init_app as init_weather
+    init_weather(app)
+    
     return app
 
 if __name__ == '__main__':
     app = create_app()
-    # Use socketio instead of Flask's built-in server
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+    
+    # Get configuration values
+    config = app.config.get_namespace('')
+    
+    # Print configuration information
+    print(f"UI update interval: {config.get('UI_UPDATE_INTERVAL', 1)} seconds")
+    print(f"Database update interval: {config.get('DB_UPDATE_INTERVAL', 60)} seconds")
+    
+    # Run the application
+    host = config.get('HOST', '0.0.0.0')
+    port = config.get('PORT', 5000)
+    debug = config.get('DEBUG', False)
+    
+    socketio.run(app, host=host, port=port, debug=debug)

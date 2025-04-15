@@ -1,0 +1,17 @@
+{
+  "sensors": {
+    "ui_update_interval": 1,
+    "db_update_interval": 60,
+    "simulation": false,
+    "pins": {
+      "dht22": 4,
+      "soil_moisture": {
+        "channel": 0,
+        "dry_value": 1023,
+        "wet_value": 300
+      },
+      "water_level": 17,
+      "relay": 18
+    }
+  }
+}

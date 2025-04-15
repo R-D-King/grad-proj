@@ -11,3 +11,5 @@ python-dateutil==2.8.2
 # For development and testing
 pytest==7.4.0
 requests==2.31.0
+# For sensor simulation
+numpy==1.24.3

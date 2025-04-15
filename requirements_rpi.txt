@@ -11,4 +11,6 @@ python-dateutil==2.8.2
 # For development and testing
 pytest==7.4.0
 requests==2.31.0
+# For sensors
+adafruit-circuitpython-dht==3.7.8
 # RPi.GPIO and spidev are installed via apt

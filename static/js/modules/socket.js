@@ -2,13 +2,14 @@
 
 // Set up Socket.IO event listeners
 function setupSocketListeners(socket) {
-    // Weather data updates
+    // Weather data updates (from database)
     socket.on('weather_update', function(data) {
-        document.getElementById('temp').innerText = data.temperature;
-        document.getElementById('humidity').innerText = data.humidity;
-        document.getElementById('soil-moisture').innerText = data.soil_moisture;
-        document.getElementById('wind-speed').innerText = data.wind_speed;
-        document.getElementById('pressure').innerText = data.pressure;
+        updateWeatherDisplay(data);
+    });
+    
+    // Real-time sensor updates (more frequent)
+    socket.on('sensor_update', function(data) {
+        updateSensorDisplay(data);
     });
     
     // Irrigation system updates
@@ -31,6 +32,23 @@ function setupSocketListeners(socket) {
     socket.on('preset_activated', function(data) {
         document.getElementById('current-preset').innerText = data.name;
     });
+}
+
+function updateWeatherDisplay(data) {
+    // Update weather data from database (less frequent)
+    if (data.temperature !== undefined) document.getElementById('temp').innerText = data.temperature;
+    if (data.humidity !== undefined) document.getElementById('humidity').innerText = data.humidity;
+    if (data.soil_moisture !== undefined) document.getElementById('soil-moisture').innerText = data.soil_moisture;
+    if (data.wind_speed !== undefined) document.getElementById('wind-speed').innerText = data.wind_speed;
+    if (data.pressure !== undefined) document.getElementById('pressure').innerText = data.pressure;
+}
+
+function updateSensorDisplay(data) {
+    // Update sensor data in real-time (more frequent)
+    if (data.temperature !== undefined) document.getElementById('temp').innerText = data.temperature;
+    if (data.humidity !== undefined) document.getElementById('humidity').innerText = data.humidity;
+    if (data.soil_moisture !== undefined) document.getElementById('soil-moisture').innerText = data.soil_moisture;
+    if (data.water_level !== undefined) document.getElementById('water-level').innerText = data.water_level;
 }
 
 // Export function

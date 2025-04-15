@@ -31,7 +31,9 @@ def install_rpi_system_packages():
         # Install other required system packages
         rpi_packages = [
             "python3-rpi.gpio",
-            "python3-spidev"
+            "python3-spidev",
+            "python3-venv",
+            "libgpiod2"  # Required for DHT sensor
         ]
         
         subprocess.check_call(["sudo", "apt", "install", "-y"] + rpi_packages)
@@ -53,6 +55,22 @@ def setup_environment():
         print("Error: Python is not installed or not in PATH.")
         sys.exit(1)
     
+    # Create virtual environment if it doesn't exist
+    if not os.path.exists("venv"):
+        print("Creating virtual environment...")
+        try:
+            subprocess.check_call([sys.executable, "-m", "venv", "venv"])
+            print("Virtual environment created successfully.")
+        except subprocess.CalledProcessError:
+            print("Error: Failed to create virtual environment.")
+            sys.exit(1)
+    
+    # Determine the pip executable in the virtual environment
+    if platform.system() == "Windows":
+        pip_executable = os.path.join("venv", "Scripts", "pip")
+    else:
+        pip_executable = os.path.join("venv", "bin", "pip")
+    
     # Detect if running on Raspberry Pi
     is_rpi = is_raspberry_pi()
     if is_rpi:
@@ -65,10 +83,15 @@ def setup_environment():
         print("Detected standard environment.")
         requirements_file = "requirements.txt"
     
-    # Install dependencies
+    # Check if requirements file exists
+    if not os.path.exists(requirements_file):
+        print(f"Error: {requirements_file} not found.")
+        sys.exit(1)
+    
+    # Install dependencies in the virtual environment
     print(f"Installing dependencies from {requirements_file}...")
     try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", requirements_file])
+        subprocess.check_call([pip_executable, "install", "-r", requirements_file])
         print("Dependencies installed successfully.")
     except subprocess.CalledProcessError:
         print("Error: Failed to install dependencies.")
@@ -80,7 +103,11 @@ def setup_environment():
         print("Created instance directory.")
     
     print("Setup completed successfully!")
-    print("\nTo run the application, use:")
+    print("\nTo run the application, activate the virtual environment and run app.py:")
+    if platform.system() == "Windows":
+        print("venv\\Scripts\\activate")
+    else:
+        print("source venv/bin/activate")
     print("python app.py")
 
 if __name__ == "__main__":

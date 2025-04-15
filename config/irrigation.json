@@ -1,0 +1,15 @@
+{
+  "pump": {
+    "default_duration": 300,
+    "min_water_level": 10,
+    "safety_timeout": 1800
+  },
+  "presets": {
+    "default_duration": 300,
+    "max_presets": 10
+  },
+  "schedules": {
+    "max_schedules": 20,
+    "min_interval": 60
+  }
+}
