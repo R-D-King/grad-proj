@@ -1,61 +1,16 @@
- Added custom styles for presets
- DOMContentLoaded event fired - Initializing presets module
- Initializing presets module...
- Setting up Add Preset button
- Initializing presets module...
-presets.js:917 Setting up Add Preset button
-presets.js:776 DOM loaded - initializing presets
-presets.js:782 Setting up Add Preset button
-presets.js:885 DOMContentLoaded event fired - Initializing presets module
-presets.js:909 Initializing presets module...
-presets.js:917 Setting up Add Preset button
-presets.js:909 Initializing presets module...
-presets.js:917 Setting up Add Preset button
-app.js:5 Application initialized
-app.js:62 Initializing modules
-app.js:549 Report type changed to: weather
-app.js:569 Toggled options for weather report
-app.js:282 Setting up event listeners
-:5000/favicon.ico:1 
-            
-            
-           Failed to load resource: the server responded with a status of 404 (NOT FOUND)
-app.js:329 Pump start response: Object
-app.js:329 Pump stop response: Object
-app.js:641 Uncaught TypeError: Cannot read properties of null (reading 'checked')
-    at getReportOptions (app.js:641:75)
-    at generateReport (app.js:608:21)
-    at HTMLButtonElement.onclick ((index):160:97)
-app.js:549 Report type changed to: irrigation
-app.js:569 Toggled options for irrigation report
-:5000/api/reports/generate:1 
-            
-            
-           Failed to load resource: the server responded with a status of 404 (NOT FOUND)
-app.js:628 Error generating report: SyntaxError: Unexpected token '<', "<!doctype "... is not valid JSON
-(anonymous) @ app.js:628
-
-
-
-
-UI update interval: 1 seconds
-Database update interval: 60 seconds
-
-Checking connected devices:
-------------------------------
-------------------------------
-Error reading DHT sensor: DHT sensor not found, check wiring
-Error reading DHT sensor: A full buffer was not returned. Try again.
-Error reading DHT sensor: Checksum did not validate. Try again.
-Error reading DHT sensor: Checksum did not validate. Try again.
-Error reading DHT sensor: Checksum did not validate. Try again.
-Error reading DHT sensor: Checksum did not validate. Try again.
-Error reading DHT sensor: Checksum did not validate. Try again.
-Error reading DHT sensor: Checksum did not validate. Try again.
-Error reading DHT sensor: Checksum did not validate. Try again.
-Error reading DHT sensor: A full buffer was not returned. Try again.
-Error reading DHT sensor: Checksum did not validate. Try again.
-Error reading DHT sensor: Checksum did not validate. Try again.
-Error reading DHT sensor: A full buffer was not returned. Try again.
-
-
+(venv) pi@pi:~/Documents/grad-proj $ python3 app.py 
+Traceback (most recent call last):
+  File "/home/pi/Documents/grad-proj/app.py", line 15, in <module>
+    from weather.routes import weather_bp
+  File "/home/pi/Documents/grad-proj/weather/__init__.py", line 7, in <module>
+    from . import routes
+  File "/home/pi/Documents/grad-proj/weather/routes.py", line 2, in <module>
+    from .controllers import get_latest_weather_data, update_weather_data
+  File "/home/pi/Documents/grad-proj/weather/controllers.py", line 7, in <module>
+    from hardware.sensor_controller import SensorController
+  File "/home/pi/Documents/grad-proj/hardware/__init__.py", line 6, in <module>
+    from .relay import Relay
+  File "/home/pi/Documents/grad-proj/hardware/relay.py", line 3, in <module>
+    from shared.config import get_config
+ImportError: cannot import name 'get_config' from 'shared.config' (/home/pi/Documents/grad-proj/shared/config.py)
+(venv) pi@pi:~/Documents/grad-proj $ 
