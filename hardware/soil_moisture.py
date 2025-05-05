@@ -24,35 +24,37 @@ def calculate_moisture_percentage(value):
     value = max(min(value, DRY_VALUE), WET_VALUE)
     return ((DRY_VALUE - value) / (DRY_VALUE - WET_VALUE)) * 100
 
-try:
-    print("Soil Moisture Sensor Test Started (Press CTRL+C to exit)")
-    print("----------------------------------------")
-    print(f"Using MCP3008 channel: {MOISTURE_CHANNEL}")
-    print("----------------------------------------")
-    
-    while True:
-        # Read sensor and calculate moisture
-        raw_value = read_adc(MOISTURE_CHANNEL)
-        moisture = calculate_moisture_percentage(raw_value)
-        
-        # Print results
-        print(f"Raw Value: {raw_value} | Moisture: {moisture:.1f}% | Channel: {MOISTURE_CHANNEL}")
-        
-        # Interpret the moisture level
-        if moisture < 30:
-            print("Status: DRY - Watering needed")
-        elif moisture < 70:
-            print("Status: MOIST - Adequate moisture")
-        else:
-            print("Status: WET - No watering needed")
-        
+# Only run the test code when this file is executed directly, not when imported
+if __name__ == "__main__":
+    try:
+        print("Soil Moisture Sensor Test Started (Press CTRL+C to exit)")
         print("----------------------------------------")
-        time.sleep(2)
+        print(f"Using MCP3008 channel: {MOISTURE_CHANNEL}")
+        print("----------------------------------------")
+        
+        while True:
+            # Read sensor and calculate moisture
+            raw_value = read_adc(MOISTURE_CHANNEL)
+            moisture = calculate_moisture_percentage(raw_value)
+            
+            # Print results
+            print(f"Raw Value: {raw_value} | Moisture: {moisture:.1f}% | Channel: {MOISTURE_CHANNEL}")
+            
+            # Interpret the moisture level
+            if moisture < 30:
+                print("Status: DRY - Watering needed")
+            elif moisture < 70:
+                print("Status: MOIST - Adequate moisture")
+            else:
+                print("Status: WET - No watering needed")
+            
+            print("----------------------------------------")
+            time.sleep(2)
 
-except KeyboardInterrupt:
-    print("Program stopped by user.")
-except Exception as e:
-    print(f"An error occurred: {e}")
-finally:
-    spi.close()
-    print("SPI connection closed.")
+    except KeyboardInterrupt:
+        print("Program stopped by user.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        spi.close()
+        print("SPI connection closed.")
