@@ -54,10 +54,6 @@ def create_app(config_class=Config):
     def index():
         return render_template('index.html')
     
-    # Initialize weather controller with app context
-    from weather.controllers import init_app as init_weather
-    init_weather(app)
-    
     return app
 
 if __name__ == '__main__':
@@ -66,13 +62,27 @@ if __name__ == '__main__':
     # Get configuration values
     config = app.config.get_namespace('')
     
-    # Print configuration information
-    print(f"UI update interval: {config.get('UI_UPDATE_INTERVAL', 1)} seconds")
-    print(f"Database update interval: {config.get('DB_UPDATE_INTERVAL', 60)} seconds")
-    
     # Run the application
     host = config.get('HOST', '0.0.0.0')
     port = config.get('PORT', 5000)
     debug = config.get('DEBUG', False)
     
+    # Print server information first
+    print("\n" + "=" * 50)
+    print(f"Starting Irrigation Control System Server")
+    print(f"Server running at: http://{host}:{port}")
+    print("=" * 50 + "\n")
+    
+    # Print configuration information
+    print(f"UI update interval: {config.get('UI_UPDATE_INTERVAL', 1)} seconds")
+    print(f"Database update interval: {config.get('DB_UPDATE_INTERVAL', 60)} seconds")
+    
+    # Initialize weather controller with app context - moved here to run after server info is displayed
+    from weather.controllers import init_app as init_weather
+    print("\nChecking connected devices:")
+    print("-" * 30)
+    init_weather(app)
+    print("-" * 30)
+    
+    # Start the server
     socketio.run(app, host=host, port=port, debug=debug)
