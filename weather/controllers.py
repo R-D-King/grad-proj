@@ -47,7 +47,6 @@ def get_latest_weather_data():
         'temperature': sensor_data.get('temperature', 0),
         'humidity': sensor_data.get('humidity', 0),
         'soil_moisture': sensor_data.get('soil_moisture', 0),
-        'wind_speed': 0,  # We don't have a wind sensor
         'pressure': 0,    # We don't have a pressure sensor
         'timestamp': sensor_data.get('timestamp', datetime.now().isoformat())
     }
@@ -61,7 +60,6 @@ def update_weather_data(data=None):
             'temperature': sensor_data.get('temperature', 0),
             'humidity': sensor_data.get('humidity', 0),
             'soil_moisture': sensor_data.get('soil_moisture', 0),
-            'wind_speed': 0,  # We don't have a wind sensor
             'pressure': 0     # We don't have a pressure sensor
         }
     
@@ -70,7 +68,6 @@ def update_weather_data(data=None):
         temperature=data.get('temperature', 0),
         humidity=data.get('humidity', 0),
         soil_moisture=data.get('soil_moisture', 0),
-        wind_speed=data.get('wind_speed', 0),
         pressure=data.get('pressure', 0)
     )
     db.session.add(weather_data)

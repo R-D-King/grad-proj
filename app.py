@@ -8,6 +8,7 @@ from shared.database import db
 from shared.socketio import socketio
 import os
 import logging
+import socket
 from shared.config import Config
 from shared.routes import shared_bp
 from irrigation.routes import irrigation_bp
@@ -17,6 +18,20 @@ from reports.routes import reports_bp
 # Set default configuration values for key operational parameters
 os.environ.setdefault('UI_UPDATE_INTERVAL', '1')  # 1 second default
 os.environ.setdefault('DB_UPDATE_INTERVAL', '60')  # 60 seconds default
+
+def get_ip_address():
+    """Get the primary IP address of the device"""
+    try:
+        # Create a socket connection to determine the primary interface IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Doesn't need to be reachable, just used to determine interface
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception as e:
+        print(f"Error getting IP address: {e}")
+        return '127.0.0.1'  # Fallback to localhost
 
 def create_app(config_class=Config):
     # Initialize configuration
@@ -40,10 +55,10 @@ def create_app(config_class=Config):
     db.init_app(app)
     socketio.init_app(app)
     
-    # Register blueprints
+    # Register blueprints - IMPORTANT: Remove url_prefix to fix 404 errors
     app.register_blueprint(shared_bp)
-    app.register_blueprint(irrigation_bp, url_prefix='/irrigation')
-    app.register_blueprint(weather_bp, url_prefix='/weather')
+    app.register_blueprint(irrigation_bp)  # Removed url_prefix
+    app.register_blueprint(weather_bp)     # Removed url_prefix
     app.register_blueprint(reports_bp, url_prefix='/reports')
     
     # Create database tables within app context
@@ -53,6 +68,12 @@ def create_app(config_class=Config):
     @app.route('/')
     def index():
         return render_template('index.html')
+        
+    # Add server time endpoint to fix 404 error
+    @app.route('/api/server-time/display', methods=['GET'])
+    def server_time():
+        from datetime import datetime
+        return {"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
     
     return app
 
@@ -62,16 +83,20 @@ if __name__ == '__main__':
     # Get configuration values
     config = app.config.get_namespace('')
     
+    # Get the device's IP address
+    ip_address = get_ip_address()
+    
     # Run the application
     host = config.get('HOST', '0.0.0.0')
     port = config.get('PORT', 5000)
     debug = config.get('DEBUG', False)
     
-    # Print server information first
-    print("\n" + "=" * 50)
+    # Print server information first with actual IP address
+    print("\n" + "=" * 60)
     print(f"Starting Irrigation Control System Server")
-    print(f"Server running at: http://{host}:{port}")
-    print("=" * 50 + "\n")
+    print(f"Local access:  http://localhost:{port}")
+    print(f"Network access: http://{ip_address}:{port}")
+    print("=" * 60 + "\n")
     
     # Print configuration information
     print(f"UI update interval: {config.get('UI_UPDATE_INTERVAL', 1)} seconds")

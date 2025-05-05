@@ -169,26 +169,36 @@ class SensorController:
                             from weather.models import WeatherData
                             from shared.database import db
                             
-                            # Create new weather data entry
-                            weather_data = WeatherData(
-                                temperature=readings.get('temperature', 0),
-                                humidity=readings.get('humidity', 0),
-                                soil_moisture=readings.get('soil_moisture', 0),
-                                wind_speed=0,  # We don't have a wind sensor
-                                pressure=0     # We don't have a pressure sensor
-                            )
-                            db.session.add(weather_data)
-                            db.session.commit()
+                            # Ensure we have valid values for required fields
+                            temperature = readings.get('temperature')
+                            humidity = readings.get('humidity')
+                            soil_moisture = readings.get('soil_moisture', 0)
                             
-                            # Emit via socketio if available
-                            if self.socketio:
-                                self.socketio.emit('weather_update', weather_data.to_dict())
+                            # Only insert into database if we have valid temperature and humidity
+                            if temperature is not None and humidity is not None:
+                                # Create new weather data entry
+                                weather_data = WeatherData(
+                                    temperature=temperature,
+                                    humidity=humidity,
+                                    soil_moisture=soil_moisture,
+                                    pressure=0     # We don't have a pressure sensor
+                                )
+                                db.session.add(weather_data)
+                                db.session.commit()
+                                
+                                # Emit via socketio if available
+                                if self.socketio:
+                                    self.socketio.emit('weather_update', weather_data.to_dict())
+                                
+                                # Update the timestamp
+                                self.last_db_update = current_time
+                                logger.debug("Updated database with sensor readings")
+                            else:
+                                logger.warning("Skipping database update due to missing temperature or humidity data")
                         
-                        # Update the timestamp
-                        self.last_db_update = current_time
-                        logger.debug("Updated database with sensor readings")
                     else:
                         logger.error("Cannot update database: Flask app not set")
+                
             except Exception as e:
                 logger.error(f"Error in DB sensor monitoring loop: {e}")
             
@@ -215,9 +225,7 @@ class SensorController:
             logger.debug(f"DHT readings: {readings['temperature']}°C, {readings['humidity']}%")
         except Exception as e:
             logger.error(f"Error reading DHT sensor: {e}")
-            readings['temperature'] = self.last_readings.get('temperature', 0)
-            readings['humidity'] = self.last_readings.get('humidity', 0)
-        
+            
         # Get soil moisture
         try:
             if hasattr(self.soil_moisture_sensor, 'read'):
@@ -231,16 +239,14 @@ class SensorController:
             logger.debug(f"Soil moisture: {readings['soil_moisture']}%")
         except Exception as e:
             logger.error(f"Error reading soil moisture sensor: {e}")
-            readings['soil_moisture'] = self.last_readings.get('soil_moisture', 0)
-        
+            
         # Get water level
         try:
             readings['water_level'] = self.water_level_sensor.get_level()
             logger.debug(f"Water level: {readings['water_level']}%")
         except Exception as e:
             logger.error(f"Error reading water level sensor: {e}")
-            readings['water_level'] = self.last_readings.get('water_level', 0)
-        
+            
         # Update last readings
         self.last_readings = readings
         return readings

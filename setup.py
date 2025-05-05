@@ -43,6 +43,8 @@ def install_rpi_system_packages():
         print(f"Error installing system packages: {e}")
         return False
 
+# In the setup_environment function, update the pip installation part:
+
 def setup_environment():
     """Set up the Python environment for the project."""
     print("Setting up the environment...")
@@ -68,8 +70,10 @@ def setup_environment():
     # Determine the pip executable in the virtual environment
     if platform.system() == "Windows":
         pip_executable = os.path.join("venv", "Scripts", "pip")
+        python_executable = os.path.join("venv", "Scripts", "python")
     else:
         pip_executable = os.path.join("venv", "bin", "pip")
+        python_executable = os.path.join("venv", "bin", "python")
     
     # Detect if running on Raspberry Pi
     is_rpi = is_raspberry_pi()
@@ -88,14 +92,31 @@ def setup_environment():
         print(f"Error: {requirements_file} not found.")
         sys.exit(1)
     
+    # Upgrade pip first to avoid issues
+    print("Upgrading pip...")
+    try:
+        subprocess.check_call([pip_executable, "install", "--upgrade", "pip"])
+        print("Pip upgraded successfully.")
+    except subprocess.CalledProcessError:
+        print("Warning: Failed to upgrade pip. Continuing with installation...")
+    
     # Install dependencies in the virtual environment
     print(f"Installing dependencies from {requirements_file}...")
     try:
-        subprocess.check_call([pip_executable, "install", "-r", requirements_file])
+        # Use --no-cache-dir to avoid caching issues
+        subprocess.check_call([pip_executable, "install", "--no-cache-dir", "-r", requirements_file])
         print("Dependencies installed successfully.")
-    except subprocess.CalledProcessError:
-        print("Error: Failed to install dependencies.")
-        sys.exit(1)
+    except subprocess.CalledProcessError as e:
+        print(f"Error: Failed to install dependencies: {e}")
+        
+        # Try an alternative approach if the first one fails
+        print("Trying alternative installation method...")
+        try:
+            subprocess.check_call([python_executable, "-m", "pip", "install", "-r", requirements_file])
+            print("Dependencies installed successfully with alternative method.")
+        except subprocess.CalledProcessError:
+            print("Error: Failed to install dependencies with alternative method.")
+            sys.exit(1)
     
     # Create instance directory if it doesn't exist
     if not os.path.exists("instance"):

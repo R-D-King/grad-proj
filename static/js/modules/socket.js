@@ -39,7 +39,6 @@ function updateWeatherDisplay(data) {
     if (data.temperature !== undefined) document.getElementById('temp').innerText = data.temperature;
     if (data.humidity !== undefined) document.getElementById('humidity').innerText = data.humidity;
     if (data.soil_moisture !== undefined) document.getElementById('soil-moisture').innerText = data.soil_moisture;
-    if (data.wind_speed !== undefined) document.getElementById('wind-speed').innerText = data.wind_speed;
     if (data.pressure !== undefined) document.getElementById('pressure').innerText = data.pressure;
 }
 
