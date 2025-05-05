@@ -26,26 +26,29 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config)
     
+    # Configure the database with an absolute path to instance/app.db
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    db_path = os.path.join(basedir, 'instance', 'app.db')
+    
+    # Ensure the instance directory exists
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    
     # Initialize extensions
-    def create_app():
-        app = Flask(__name__)
-        
-        # Configure the database with an absolute path to instance/app.db
-        basedir = os.path.abspath(os.path.dirname(__file__))
-        db_path = os.path.join(basedir, 'instance', 'app.db')
-        
-        # Ensure the instance directory exists
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        
-        app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
-        app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-        
-        # Initialize database
-        db.init_app(app)
-        
-        # Create database tables within app context
-        with app.app_context():
-            db.create_all()
+    db.init_app(app)
+    socketio.init_app(app)
+    
+    # Register blueprints
+    app.register_blueprint(shared_bp)
+    app.register_blueprint(irrigation_bp, url_prefix='/irrigation')
+    app.register_blueprint(weather_bp, url_prefix='/weather')
+    app.register_blueprint(reports_bp, url_prefix='/reports')
+    
+    # Create database tables within app context
+    with app.app_context():
+        db.create_all()
     
     @app.route('/')
     def index():
