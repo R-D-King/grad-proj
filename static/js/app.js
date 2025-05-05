@@ -631,20 +631,37 @@ function generateReport() {
 }
 
 // Helper function to get report options
-function getReportOptions(reportType) {
+function getReportOptions() {
+    const reportType = document.getElementById('report-type').value;
     const options = {};
     
-    if (reportType === 'weather') {
-        options.temperature = document.getElementById('weather-temperature').checked;
-        options.humidity = document.getElementById('weather-humidity').checked;
-        options.soil_moisture = document.getElementById('weather-soil-moisture').checked;
-        options.wind_speed = document.getElementById('weather-wind-speed').checked;
-        options.pressure = document.getElementById('weather-pressure').checked;
-    } else {
-        options.pump_status = document.getElementById('irrigation-pump-status').checked;
-        options.water_level = document.getElementById('irrigation-water-level').checked;
-        options.duration = document.getElementById('irrigation-duration').checked;
+    // Get all option checkboxes for the current report type
+    const optionElements = document.querySelectorAll(`.report-options-${reportType} input[type="checkbox"]`);
+    
+    // If no option elements found, return default options
+    if (!optionElements || optionElements.length === 0) {
+        if (reportType === 'weather') {
+            return {
+                temperature: true,
+                humidity: true,
+                soil_moisture: true
+            };
+        } else if (reportType === 'irrigation') {
+            return {
+                pump_status: true,
+                water_level: true,
+                duration: true
+            };
+        }
+        return {};
     }
+    
+    // Process each checkbox
+    optionElements.forEach(element => {
+        if (element && element.checked !== undefined) {
+            options[element.id.replace(`${reportType}-option-`, '')] = element.checked;
+        }
+    });
     
     return options;
 }

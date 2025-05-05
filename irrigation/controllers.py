@@ -101,35 +101,37 @@ def activate_preset(preset_id):
         logger.error(f"Error activating preset {preset_id}: {str(e)}")
         return {"status": "error", "message": f"Error activating preset: {str(e)}"}
 
-def start_pump(preset_id=None):
+def start_pump():
     """Start the irrigation pump."""
     global pump_running, pump_start_time
     
     with pump_lock:
+        # Check if pump is already running
         if pump_running:
-            return {"status": "warning", "message": "Water Pump already running", "runtime": get_pump_duration(), "pump_status": pump.get_state()}
+            return {"status": "warning", "message": "Water Pump already running", "runtime": get_pump_duration(), "pump_status": pump.get_status()}
         
         # Check water level
         water_level = get_water_level()
-        if water_level['level'] < 20:
-            return {"status": "error", "message": "Water level too low", "water_level": water_level}
+        if water_level['level'] < 10:  # 10% minimum water level
+            return {"status": "error", "message": "Water level too low", "water_level": water_level, "pump_status": pump.get_status()}
         
         # Start the pump
-        pump.on()
+        success = pump.on()
+        if not success:
+            return {"status": "error", "message": "Failed to start pump", "pump_status": pump.get_status()}
+        
+        # Update state
         pump_running = True
-        pump_start_time = datetime.now()
+        pump_start_time = time.time()
         
         # Log pump start in database
         log_pump_action("start")
-        
-        # Log the irrigation event
-        log_irrigation_event(preset_id=preset_id, pump_status=True, water_level=water_level['level'])
         
         return {
             "status": "success", 
             "message": "Water Pump started", 
             "runtime": 0,
-            "pump_status": pump.get_state()
+            "pump_status": pump.get_status()
         }
 
 def stop_pump():

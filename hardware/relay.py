@@ -1,80 +1,77 @@
-"""
-Relay control module for switching devices on and off.
-"""
 import logging
 import time
+from shared.config import get_config
 
-# Set up logging
 logger = logging.getLogger(__name__)
 
 class Relay:
-    """
-    Class to control a relay for switching devices on and off.
+    """Class to control a relay module."""
     
-    In production, this interfaces with GPIO pins on a Raspberry Pi
-    or similar device. For development, it simulates the behavior.
-    """
-    
-    def __init__(self, pin, name="Relay", active_high=True, simulation=True):
-        """
-        Initialize the relay.
-        
-        Args:
-            pin (int): GPIO pin number
-            name (str): Name of the relay for logging
-            active_high (bool): True if relay is activated by HIGH signal
-            simulation (bool): True to run in simulation mode
-        """
+    def __init__(self, pin=None, simulated=False):
+        """Initialize the relay controller."""
         self.pin = pin
-        self.name = name
-        self.active_high = active_high
-        self.simulation = simulation
-        self.state = False
+        self.simulated = simulated
+        self.state = False  # Default state is OFF
         
-        if not simulation:
+        if not simulated and pin is not None:
             try:
                 import RPi.GPIO as GPIO
                 self.GPIO = GPIO
                 GPIO.setmode(GPIO.BCM)
                 GPIO.setup(pin, GPIO.OUT)
-                self._set_state(False)  # Initialize to OFF
-                logger.info(f"Initialized {name} on pin {pin}")
-            except ImportError:
-                logger.warning("RPi.GPIO not available, falling back to simulation mode")
-                self.simulation = True
-        
-    def _set_state(self, state):
-        """Set the physical state of the relay."""
-        if not self.simulation:
-            output = state if self.active_high else not state
-            self.GPIO.output(self.pin, output)
-        self.state = state
+                GPIO.output(pin, GPIO.LOW)  # Start with relay OFF
+                logger.info(f"Hardware relay initialized on pin {pin}")
+            except (ImportError, RuntimeError) as e:
+                logger.warning(f"Failed to initialize hardware relay: {e}")
+                logger.info("Falling back to simulated relay")
+                self.simulated = True
+        else:
+            logger.info("Using simulated relay")
+            self.simulated = True
     
     def on(self):
-        """Turn the relay on."""
-        logger.info(f"Turning {self.name} ON")
-        self._set_state(True)
-        return True
+        """Turn the relay ON."""
+        if not self.simulated:
+            try:
+                self.GPIO.output(self.pin, self.GPIO.HIGH)
+            except Exception as e:
+                logger.error(f"Error turning relay ON: {e}")
+                return False
         
-    def off(self):
-        """Turn the relay off."""
-        logger.info(f"Turning {self.name} OFF")
-        self._set_state(False)
+        self.state = True
+        logger.info(f"Relay {'(simulated) ' if self.simulated else ''}turned ON")
         return True
     
-    def toggle(self):
-        """Toggle the relay state."""
-        if self.state:
-            return self.off()
-        else:
-            return self.on()
+    def off(self):
+        """Turn the relay OFF."""
+        if not self.simulated:
+            try:
+                self.GPIO.output(self.pin, self.GPIO.LOW)
+            except Exception as e:
+                logger.error(f"Error turning relay OFF: {e}")
+                return False
+        
+        self.state = False
+        logger.info(f"Relay {'(simulated) ' if self.simulated else ''}turned OFF")
+        return True
     
     def get_state(self):
         """Get the current state of the relay."""
         return self.state
     
+    def get_status(self):
+        """Get a status dictionary for the relay."""
+        return {
+            "state": self.state,
+            "simulated": self.simulated,
+            "pin": self.pin if not self.simulated else None
+        }
+    
     def cleanup(self):
         """Clean up GPIO resources."""
-        if not self.simulation:
-            self.GPIO.cleanup(self.pin)
-            logger.info(f"Cleaned up {self.name} on pin {self.pin}")
+        if not self.simulated:
+            try:
+                self.GPIO.cleanup(self.pin)
+                logger.info(f"Cleaned up GPIO pin {self.pin}")
+            except Exception as e:
+                logger.error(f"Error cleaning up GPIO: {e}")

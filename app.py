@@ -14,6 +14,7 @@ from shared.routes import shared_bp
 from irrigation.routes import irrigation_bp
 from weather.routes import weather_bp
 from reports.routes import reports_bp
+app.register_blueprint(reports_bp)
 
 # Set default configuration values for key operational parameters
 os.environ.setdefault('UI_UPDATE_INTERVAL', '1')  # 1 second default

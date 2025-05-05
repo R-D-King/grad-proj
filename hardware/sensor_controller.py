@@ -237,11 +237,12 @@ class SensorController:
             logger.debug(f"DHT readings: {readings['temperature']}°C, {readings['humidity']}%")
         except Exception as e:
             logger.error(f"Error reading DHT sensor: {e}")
-            # Provide realistic default values
+            # Provide realistic default values and mark as simulated
             import random
             readings['temperature'] = round(random.uniform(18.0, 25.0), 1)  # Realistic room temperature
             readings['humidity'] = round(random.uniform(40.0, 60.0), 1)     # Realistic indoor humidity
-            
+            readings['simulated'] = True  # Flag to indicate these are simulated values
+        
         # Get soil moisture
         try:
             if hasattr(self.soil_moisture_sensor, 'read'):
