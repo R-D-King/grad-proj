@@ -50,5 +50,62 @@ function updateSensorDisplay(data) {
     if (data.water_level !== undefined) document.getElementById('water-level').innerText = data.water_level;
 }
 
+// Add this function to update sensor status indicators
+function updateSensorStatus(data) {
+    if (data.sensor_status) {
+        // Update DHT sensor status
+        const dhtStatus = document.getElementById('dht-status');
+        if (dhtStatus) {
+            if (data.sensor_status.dht_simulated) {
+                dhtStatus.className = 'badge bg-warning';
+                dhtStatus.innerText = 'Simulated';
+            } else {
+                dhtStatus.className = 'badge bg-success';
+                dhtStatus.innerText = 'Connected';
+            }
+        }
+        
+        // Update soil moisture sensor status
+        const soilStatus = document.getElementById('soil-status');
+        if (soilStatus) {
+            if (data.sensor_status.soil_simulated) {
+                soilStatus.className = 'badge bg-warning';
+                soilStatus.innerText = 'Simulated';
+            } else {
+                soilStatus.className = 'badge bg-success';
+                soilStatus.innerText = 'Connected';
+            }
+        }
+        
+        // Water level is always simulated for now
+        const waterStatus = document.getElementById('water-status');
+        if (waterStatus) {
+            waterStatus.className = 'badge bg-warning';
+            waterStatus.innerText = 'Simulated';
+        }
+    }
+}
+
+// Add this to your socket connection setup
+socket.on('sensor_status', function(data) {
+    updateSensorStatus(data);
+});
+
+// Add this to your initialization function
+function initializeSocket() {
+    // Request sensor status on connection
+    socket.on('connect', function() {
+        socket.emit('get_sensor_status');
+    });
+    
+    socket.on('water_level', function(data) {
+        document.getElementById('water-level').innerText = data.level;
+    });
+    
+    socket.on('preset_activated', function(data) {
+        document.getElementById('current-preset').innerText = data.name;
+    });
+}
+
 // Export function
 window.setupSocketListeners = setupSocketListeners;

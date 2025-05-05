@@ -70,7 +70,28 @@
                 </div>
             </div>
         </div>
-
+        <!-- Add this right after your weather data section -->
+<div class="card mt-3">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0">Sensor Status</h5>
+    </div>
+    <div class="card-body">
+        <ul class="list-group list-group-flush" id="sensor-status">
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                Temperature & Humidity
+                <span class="badge bg-primary" id="dht-status">Checking...</span>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                Soil Moisture
+                <span class="badge bg-primary" id="soil-status">Checking...</span>
+            </li>
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                Water Level
+                <span class="badge bg-warning" id="water-status">Simulated</span>
+            </li>
+        </ul>
+    </div>
+</div>
         <!-- Irrigation Presets -->
         <div class="row mt-4">
             <div class="col-md-12">
