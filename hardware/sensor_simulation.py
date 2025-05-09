@@ -1,85 +1,82 @@
-"""
-Module for simulating sensor readings when hardware is not available.
-"""
 import random
 import time
-from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
+
+class SimulatedSensor:
+    """Base class for simulated sensors."""
+    
+    def __init__(self, sensor_type, min_value=0, max_value=100, default_value=None, variation=5.0):
+        """Initialize a simulated sensor.
+        
+        Args:
+            sensor_type: Type of sensor being simulated
+            min_value: Minimum possible value
+            max_value: Maximum possible value
+            default_value: Default value to start with (if None, will use middle of range)
+            variation: Maximum variation per reading (percentage of range)
+        """
+        self.sensor_type = sensor_type
+        self.min_value = min_value
+        self.max_value = max_value
+        self.default_value = default_value if default_value is not None else (min_value + max_value) / 2
+        self.variation = variation
+        self.current_value = self.default_value
+        
+        logger.info(f"Initialized simulated {sensor_type} sensor with range {min_value}-{max_value}")
+    
+    def read(self):
+        """Read a simulated value."""
+        # Calculate the maximum change allowed
+        value_range = self.max_value - self.min_value
+        max_change = (value_range * self.variation) / 100.0
+        
+        # Generate a random change
+        change = random.uniform(-max_change, max_change)
+        
+        # Apply the change to the current value
+        self.current_value += change
+        
+        # Ensure the value stays within the allowed range
+        self.current_value = max(self.min_value, min(self.max_value, self.current_value))
+        
+        # Return the current value
+        return self.current_value
 
 class SimulatedDHT:
-    """Simulates a DHT22 temperature and humidity sensor."""
+    """Simulated DHT22 temperature and humidity sensor."""
     
-    def __init__(self, base_temp=22.0, base_humidity=50.0):
-        """Initialize the simulated sensor with base values."""
-        self.base_temp = base_temp
-        self.base_humidity = base_humidity
-        self.last_update = time.time()
+    def __init__(self, temp_min=18.0, temp_max=30.0, humid_min=30.0, humid_max=80.0):
+        """Initialize the simulated DHT sensor.
+        
+        Args:
+            temp_min: Minimum temperature value
+            temp_max: Maximum temperature value
+            humid_min: Minimum humidity value
+            humid_max: Maximum humidity value
+        """
+        self.temp_sensor = SimulatedSensor('temperature', temp_min, temp_max)
+        self.humid_sensor = SimulatedSensor('humidity', humid_min, humid_max)
     
     def read(self):
-        """Simulate reading temperature and humidity values."""
-        # Add some random variation
-        current_time = time.time()
-        time_diff = current_time - self.last_update
-        
-        # More variation if more time has passed (max ±3 degrees/percent)
-        max_variation = min(3.0, time_diff / 60.0)
-        
-        temperature = self.base_temp + random.uniform(-max_variation, max_variation)
-        humidity = self.base_humidity + random.uniform(-max_variation, max_variation)
-        
-        # Ensure humidity stays in valid range
-        humidity = max(0, min(100, humidity))
-        
-        self.last_update = current_time
-        
-        return {
-            'temperature': round(temperature, 1),
-            'humidity': round(humidity, 1),
-            'timestamp': datetime.now().isoformat()
-        }
+        """Read simulated temperature and humidity values."""
+        temperature = self.temp_sensor.read()
+        humidity = self.humid_sensor.read()
+        return temperature, humidity
 
 class SimulatedSoilMoisture:
-    """Simulates a soil moisture sensor."""
+    """Simulated soil moisture sensor."""
     
-    def __init__(self, base_moisture=60.0):
-        """Initialize the simulated sensor with base moisture value."""
-        self.base_moisture = base_moisture
-        self.last_update = time.time()
-        self.trend = 0  # -1 for decreasing, 0 for stable, 1 for increasing
-        self.trend_duration = 0
+    def __init__(self, min_value=0.0, max_value=100.0):
+        """Initialize the simulated soil moisture sensor.
+        
+        Args:
+            min_value: Minimum moisture value (0%)
+            max_value: Maximum moisture value (100%)
+        """
+        self.sensor = SimulatedSensor('soil_moisture', min_value, max_value)
     
     def read(self):
-        """Simulate reading soil moisture values."""
-        current_time = time.time()
-        time_diff = current_time - self.last_update
-        
-        # Change trend occasionally
-        if self.trend_duration <= 0:
-            self.trend = random.choice([-1, 0, 0, 1])  # More likely to be stable
-            self.trend_duration = random.randint(5, 20)  # Trend lasts for 5-20 readings
-        self.trend_duration -= 1
-        
-        # Calculate moisture change based on trend and time difference
-        change_rate = 0.05 * time_diff  # % change per second
-        if self.trend == -1:
-            # Decreasing (drying out)
-            change = -change_rate
-        elif self.trend == 1:
-            # Increasing (getting wetter)
-            change = change_rate
-        else:
-            # Stable with small random fluctuations
-            change = random.uniform(-0.2, 0.2) * change_rate
-        
-        # Update moisture level
-        self.base_moisture += change
-        
-        # Ensure moisture stays in valid range
-        self.base_moisture = max(0, min(100, self.base_moisture))
-        
-        self.last_update = current_time
-        
-        return {
-            'moisture': round(self.base_moisture, 1),
-            'raw_value': int(1023 * (1 - self.base_moisture / 100)),  # Simulate raw ADC value
-            'timestamp': datetime.now().isoformat()
-        }
+        """Read simulated soil moisture value."""
+        return self.sensor.read()

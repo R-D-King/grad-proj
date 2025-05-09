@@ -13,6 +13,10 @@ A web-based irrigation system with weather monitoring capabilities.
 - Customizable data reports with filtering options
 - Temperature and humidity monitoring with DHT22 sensor
 - Soil moisture monitoring with capacitive soil moisture sensor
+- Light level monitoring with LDR sensor
+- Rain detection with rain sensor
+- Pressure and altitude monitoring with BMP180 sensor
+- Sensor simulation mode for development and testing
 
 ## Setup
 
@@ -32,6 +36,9 @@ A web-based irrigation system with weather monitoring capabilities.
    - DHT22 temperature/humidity sensor to GPIO pin 4
    - Soil moisture sensor to SPI interface (MCP3008 ADC on channel 0)
    - Water level sensor to GPIO pin 17
+   - Light sensor (LDR) to MCP3008 ADC on channel 1
+   - Rain sensor to MCP3008 ADC on channel 2
+   - BMP180 pressure sensor to I2C bus
 3. Run the setup script to create a virtual environment and install dependencies:
    ```python setup.py```
 4. Activate the virtual environment: ```source venv/bin/activate```
@@ -43,9 +50,13 @@ A web-based irrigation system with weather monitoring capabilities.
 - Raspberry Pi (3B+ or 4 recommended)
 - DHT22 temperature and humidity sensor
 - Capacitive soil moisture sensor
-- MCP3008 analog-to-digital converter (for soil moisture sensor)
+- MCP3008 analog-to-digital converter (for soil moisture, LDR, and rain sensors)
 - Water level sensor
+- Light dependent resistor (LDR) for light level sensing
+- Rain sensor with analog output
+- BMP180 pressure and temperature sensor
 - Relay module for pump control
+- 16x2 LCD display (optional)
 
 ## Project Structure
 
@@ -77,6 +88,10 @@ A web-based irrigation system with weather monitoring capabilities.
   - `pump.py` - Pump control logic
   - `soil_moisture.py` - Soil moisture sensor interface
   - `dht22.py` - DHT22 temperature and humidity sensor interface
+  - `bmp180.py` - BMP180 pressure and temperature sensor interface
+  - `ldr_aout.py` - Light dependent resistor sensor interface
+  - `rain-aout.py` - Rain sensor interface
+  - `lcd_16x2.py` - 16x2 LCD display interface
   - `sensor_controller.py` - Unified sensor management
   - `sensor_simulation.py` - Sensor simulation for development
 - `instance/` - Instance-specific files (database)
@@ -127,6 +142,8 @@ For Raspberry Pi, additional packages are required:
 - RPi.GPIO (for GPIO control)
 - spidev (for SPI communication)
 - adafruit-circuitpython-dht (for DHT22 sensor)
+- smbus (for I2C communication with BMP180)
+- RPLCD (for LCD display)
 
 ## WebSocket Events
 
@@ -134,6 +151,16 @@ The application uses WebSockets for real-time updates:
 - `weather_update` - Sent when new weather data is available
 - `preset_activated` - Sent when an irrigation preset is activated
 - `pump_status_change` - Sent when the pump status changes
+- `sensor_update` - Sent when new sensor readings are available
+
+## Sensor Simulation
+
+The application includes a simulation mode for development and testing without physical hardware:
+
+- Enable simulation mode by setting the environment variable: `SENSOR_SIMULATION=true`
+- All sensors will generate realistic simulated values
+- Simulated values will vary slightly over time to mimic real sensor behavior
+- The LCD display will show simulated output in the console
 
 ## Resolved Issues
 
@@ -158,6 +185,10 @@ The following issues have been fixed:
 5. UI Display:
    - ✅ Fixed water level display showing duplicate percentage signs
    - ✅ Running time counter now displays integer values without decimal places
+
+6. Sensor Simulation:
+   - ✅ Added missing sensor simulation module
+   - ✅ Fixed import error for SimulatedSensor class
 
 ## Known Issues
 
@@ -216,6 +247,11 @@ The soil moisture sensor may need calibration for your specific soil type:
 1. Place the sensor in completely dry soil and note the reading
 2. Place the sensor in saturated soil and note the reading
 3. Update the `DRY_VALUE` and `WET_VALUE` constants in `hardware/soil_moisture.py`
+
+Similarly, the LDR sensor may need calibration for your lighting conditions:
+1. Test the sensor in complete darkness and note the reading
+2. Test the sensor in bright light and note the reading
+3. Update the `min_value` and `max_value` parameters in `hardware/ldr_aout.py`
 
 # Configuration
 
