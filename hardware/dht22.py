@@ -1,55 +1,73 @@
-import adafruit_dht  # Installation: See README.md for proper installation instructions
-import board
 import time
-import signal
-import sys
-import logging
+import random
+import board
+import adafruit_dht
 
-logger = logging.getLogger(__name__)
-
-# Define sensor type and pin (using BCM pin numbering)
-DHT_PIN = 26
-dht_sensor = adafruit_dht.DHT22(getattr(board, f"D{DHT_PIN}"))
-
-# Function to handle clean exit
-def signal_handler(sig, frame):
-    logger.info("\nProgram terminated.")
-    # Clean up resources
-    dht_sensor.exit()
-    sys.exit(0)
-
-# Register signal handler for clean exit
-signal.signal(signal.SIGINT, signal_handler)
-
-# Main loop
-try:
-    logger.info("DHT22 Sensor Reading (Press CTRL+C to exit)")
-    logger.info("----------------------------------------")
+class DHT22Sensor:
+    """DHT22 temperature and humidity sensor interface."""
     
-    while True:
-        try:
-            temperature = dht_sensor.temperature
-            humidity = dht_sensor.humidity
-            
-            if humidity is not None and temperature is not None:
-                logger.info(f"Temperature: {temperature:.1f}°C")
-                logger.info(f"Humidity: {humidity:.1f}%")
-            else:
-                logger.error("Failed to read data from sensor")
-            
-            logger.info("----------------------------------------")
-        except RuntimeError as e:
-            # DHT sensors sometimes fail to read, just try again
-            logger.error(f"Reading error: {e}")
+    def __init__(self, pin=4, simulation=False, max_retries=3):
+        """Initialize the DHT22 sensor.
         
-        time.sleep(2)  # DHT22 needs at least 2 seconds between readings
-
-except Exception as e:
-    logger.error(f"An error occurred: {e}")
-finally:
-    # This will run on any exit except when CTRL+C is pressed (which is handled by signal_handler)
-    logger.info("Program ended.")
-    try:
-        dht_sensor.exit()
-    except:
-        pass
+        Args:
+            pin: GPIO pin number (default: 4)
+            simulation: Whether to simulate readings
+            max_retries: Maximum number of retries for failed readings
+        """
+        self.pin = pin
+        self.simulation = simulation
+        self.max_retries = max_retries
+        self.dht_device = None
+        
+        if not simulation:
+            try:
+                # Use the board module to get the correct pin
+                dht_pin = getattr(board, f"D{pin}")
+                self.dht_device = adafruit_dht.DHT22(dht_pin, use_pulseio=False)
+                # Test reading to verify connection
+                self.read()
+            except (ImportError, ValueError, RuntimeError) as e:
+                print(f"Error initializing DHT22 sensor: {e}")
+                self.simulation = True
+                print("Using simulation mode for DHT22 sensor")
+    
+    def read(self):
+        """Read temperature and humidity from the sensor."""
+        if self.simulation:
+            # Return simulated values
+            temperature = round(random.uniform(18.0, 28.0), 1)
+            humidity = round(random.uniform(30.0, 70.0), 1)
+            return {'temperature': temperature, 'humidity': humidity}
+        
+        # Try to read with retries
+        for attempt in range(self.max_retries):
+            try:
+                temperature = self.dht_device.temperature
+                humidity = self.dht_device.humidity
+                
+                # Validate readings
+                if temperature is not None and humidity is not None:
+                    return {'temperature': temperature, 'humidity': humidity}
+                
+            except RuntimeError as e:
+                # DHT sensor errors are common, just retry
+                if attempt < self.max_retries - 1:
+                    print(f"DHT reading error (attempt {attempt+1}/{self.max_retries}): {e}")
+                    time.sleep(2.0)  # DHT sensors need 2 seconds between readings
+                else:
+                    print(f"Failed to read DHT after {self.max_retries} attempts: {e}")
+                    # Return None values on failure
+                    return {'temperature': None, 'humidity': None}
+            
+            except Exception as e:
+                print(f"Unexpected error reading DHT: {e}")
+                return {'temperature': None, 'humidity': None}
+    
+    def cleanup(self):
+        """Clean up resources."""
+        if not self.simulation and self.dht_device:
+            try:
+                self.dht_device.exit()
+                print("DHT22 sensor resources released")
+            except Exception as e:
+                print(f"Error cleaning up DHT22 sensor: {e}")
