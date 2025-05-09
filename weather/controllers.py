@@ -90,6 +90,63 @@ def init_app(app):
         logger.error(f"Failed to initialize LCD display: {e}")
         lcd = None
 
+def get_pressure_display():
+    """Get formatted pressure display data."""
+    from hardware.bmp180 import BMP180Sensor
+    
+    try:
+        # Create a BMP180 sensor instance
+        bmp_sensor = BMP180Sensor(simulation=simulation_mode)
+        
+        # Get the pressure reading
+        _, pressure, _ = bmp_sensor.read()
+        
+        if pressure is None:
+            return ("Pressure:", "Not available")
+        
+        # Format the pressure reading
+        return (f"Pressure:", f"{pressure:.1f} hPa")
+    except Exception:
+        return ("Pressure:", "Error")
+
+def get_light_display():
+    """Get formatted light display data."""
+    from hardware.ldr_aout import LDRSensor
+    
+    try:
+        # Create an LDR sensor instance
+        ldr_sensor = LDRSensor(simulation=simulation_mode)
+        
+        # Get the light percentage
+        light = ldr_sensor.get_light_percentage()
+        
+        if light is None:
+            return ("Light Level:", "Not available")
+        
+        # Format the light reading
+        return (f"Light Level:", f"{light:.1f}%")
+    except Exception:
+        return ("Light Level:", "Error")
+
+def get_rain_display():
+    """Get formatted rain display data."""
+    from hardware.rain_aout import RainSensor
+    
+    try:
+        # Create a Rain sensor instance
+        rain_sensor = RainSensor(simulation=simulation_mode)
+        
+        # Get the rain percentage
+        rain = rain_sensor.get_rain_percentage()
+        
+        if rain is None:
+            return ("Rain Level:", "Not available")
+        
+        # Format the rain reading
+        return (f"Rain Level:", f"{rain:.1f}%")
+    except Exception:
+        return ("Rain Level:", "Error")
+
 def lcd_update_loop(app):
     """Background thread for updating LCD display."""
     global lcd_running
@@ -99,7 +156,7 @@ def lcd_update_loop(app):
     
     # Define display modes and their data
     display_modes = [
-        # Mode 0: Network Name (SSID) - Now first in the list
+        # Mode 0: Network Name (SSID)
         lambda: (f"Network:", 
                 f"{get_network_ssid()}"),
         
@@ -113,8 +170,16 @@ def lcd_update_loop(app):
         
         # Mode 3: Soil Moisture
         lambda: (f"Soil Moisture:", 
-                f"{sensor_controller.get_latest_readings().get('soil_moisture', 0):.1f}%")
+                f"{sensor_controller.get_latest_readings().get('soil_moisture', 0):.1f}%"),
         
+        # Mode 4: Pressure from BMP180
+        lambda: get_pressure_display(),
+        
+        # Mode 5: Light Percentage from LDR
+        lambda: get_light_display(),
+                
+        # Mode 6: Rain Percentage
+        lambda: get_rain_display()
     ]
     
     current_mode = 0
@@ -135,47 +200,8 @@ def lcd_update_loop(app):
             # Wait before changing display
             time.sleep(3)
         except Exception as e:
-            logger.error(f"Error updating LCD: {e}")
+            # Don't print error to terminal
             time.sleep(1)
-
-def get_pressure_display():
-    """Get formatted pressure display data."""
-    readings = sensor_controller.get_latest_readings()
-    pressure = readings.get('pressure')
-    if pressure is None:
-        return ("Pressure:", "Not available")
-    try:
-        # Try to format as float, but handle any conversion errors
-        return (f"Pressure:", f"{float(pressure):.1f} hPa")
-    except (ValueError, TypeError):
-        # If conversion fails, just display the raw value
-        return (f"Pressure:", f"{pressure} hPa")
-
-def get_light_display():
-    """Get formatted light display data."""
-    readings = sensor_controller.get_latest_readings()
-    light = readings.get('light')
-    if light is None:
-        return ("Light Level:", "Not available")
-    try:
-        # Try to format as float, but handle any conversion errors
-        return (f"Light Level:", f"{float(light):.1f}%")
-    except (ValueError, TypeError):
-        # If conversion fails, just display the raw value
-        return (f"Light Level:", f"{light}%")
-
-def get_rain_display():
-    """Get formatted rain display data."""
-    readings = sensor_controller.get_latest_readings()
-    rain = readings.get('rain')
-    if rain is None:
-        return ("Rain Level:", "Not available")
-    try:
-        # Try to format as float, but handle any conversion errors
-        return (f"Rain Level:", f"{float(rain):.1f}%")
-    except (ValueError, TypeError):
-        # If conversion fails, just display the raw value
-        return (f"Rain Level:", f"{rain}%")
 
 def get_latest_weather_data():
     """Get the latest weather data."""
@@ -236,3 +262,15 @@ def get_network_ssid():
     except Exception as e:
         logger.error(f"Error getting network SSID: {e}")
         return "Unknown"
+
+
+def display_shutdown():
+    """Display shutdown message on the LCD."""
+    global lcd
+    if lcd:
+        try:
+            lcd.clear()
+            lcd.write_line(0, "System")
+            lcd.write_line(1, "Shutting Down...")
+        except Exception:
+            pass

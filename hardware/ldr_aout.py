@@ -1,24 +1,45 @@
-import os
-import json
+import spidev
 import time
-import signal
-import sys
-import logging
+import random
 
-logger = logging.getLogger(__name__)
+# MCP3008 SPI Configuration
+spi = spidev.SpiDev()
+spi.open(0, 0)  # Open SPI bus 0, device 0
+spi.max_speed_hz = 1000000  # Set SPI speed to 1MHz
 
+# Define the channel for the LDR sensor
+LDR_CHANNEL = 1  # Default to channel 1, can be changed as needed
+
+def read_channel(channel):
+    # Read analog data from MCP3008 ADC
+    # MCP3008 communication protocol requires 3 bytes:
+    # 1st byte: Start bit (1)
+    # 2nd byte: Single-ended mode (1) + channel selection (3 bits) + padding
+    # 3rd byte: Don't care (0) - needed to clock out the data
+    adc = spi.xfer2([1, (8 + channel) << 4, 0])
+    
+    # Extract the 10-bit ADC value from the response:
+    # - adc[1] contains 2 least significant bits of the result
+    # - adc[2] contains the remaining 8 bits
+    data = ((adc[1] & 3) << 8) + adc[2]
+    return data
+
+def convert_to_percent(value, min_val, max_val):
+    # Convert raw ADC value to percentage based on calibration range
+    # Formula: ((current - min) / (max - min)) * 100
+    percent = ((max_val - value) / (max_val - min_val)) * 100
+    return max(0, min(100, percent))  # Clamp values to 0-100% range
+
+# Calibration values for the LDR sensor
+LDR_MIN = 0      # ADC value in complete darkness (0V)
+LDR_MAX = 1023   # ADC value in bright light (3.3V) - 10-bit ADC has max value of 1023
+
+# Add a LDRSensor class for better integration with other files
 class LDRSensor:
     """Light Dependent Resistor (LDR) sensor interface."""
     
-    def __init__(self, channel=1, min_value=0, max_value=1023, simulation=False):
-        """Initialize the LDR sensor.
-        
-        Args:
-            channel: ADC channel for the sensor (default: 1)
-            min_value: Minimum ADC value (darkness) (default: 0)
-            max_value: Maximum ADC value (brightness) (default: 1023)
-            simulation: Whether to simulate readings
-        """
+    def __init__(self, channel=LDR_CHANNEL, min_value=LDR_MIN, max_value=LDR_MAX, simulation=False):
+        """Initialize the LDR sensor."""
         self.channel = channel
         self.min_value = min_value
         self.max_value = max_value
@@ -27,110 +48,59 @@ class LDRSensor:
         
         if not simulation:
             try:
-                import spidev
                 self.spi = spidev.SpiDev()
                 self.spi.open(0, 0)  # Open SPI bus 0, device 0
                 self.spi.max_speed_hz = 1000000  # Set SPI speed to 1MHz
-            except (ImportError, IOError) as e:
-                logger.error(f"Error initializing SPI for LDR: {e}")
+            except (ImportError, IOError):
                 self.simulation = True
-                logger.info("Using simulation mode for LDR sensor")
     
     def read_channel(self):
         """Read raw analog data from MCP3008 ADC."""
         if self.simulation:
             # Return a simulated value
-            import random
             return int(random.uniform(self.min_value, self.max_value))
         
         try:
-            adc = self.spi.xfer2([1, (8 + self.channel) << 4, 0])
-            data = ((adc[1] & 3) << 8) + adc[2]
-            return data
-        except Exception as e:
-            logger.error(f"Error reading LDR sensor: {e}")
+            if self.spi:
+                adc = self.spi.xfer2([1, (8 + self.channel) << 4, 0])
+                data = ((adc[1] & 3) << 8) + adc[2]
+                return data
+            else:
+                # Use global SPI if instance SPI is not available
+                return read_channel(self.channel)
+        except Exception:
             # Return a simulated value on error
-            import random
             return int(random.uniform(self.min_value, self.max_value))
     
     def get_light_percentage(self):
         """Get the current light level as a percentage."""
         raw_value = self.read_channel()
         
-        # Convert raw value to percentage (higher value = more light)
-        # Formula: ((max - current) / (max - min)) * 100
-        percentage = ((self.max_value - raw_value) / (self.max_value - self.min_value)) * 100
-        
-        # Clamp to 0-100% range
-        return max(0, min(100, percentage))
+        # Convert raw value to light percentage
+        return convert_to_percent(raw_value, self.min_value, self.max_value)
+    
+    def read(self):
+        """Get the current light level as a percentage (alias for get_light_percentage)."""
+        return self.get_light_percentage()
     
     def close(self):
         """Close the SPI connection."""
         if not self.simulation and self.spi:
             self.spi.close()
 
-# Function to load configuration
-def load_config():
-    config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'hardware.json')
-    try:
-        with open(config_path, 'r') as f:
-            config = json.load(f)
-        return config
-    except Exception as e:
-        logger.error(f"Error loading configuration: {e}")
-        return {"sensors": {"simulation": True, "pins": {"ldr": {"channel": 1, "min_value": 0, "max_value": 1023}}}}
-
-# Function to handle clean exit
-def signal_handler(sig, frame):
-    logger.info("\Program terminated.")
-    sys.exit(0)
-
-# Register signal handler for clean exit
-signal.signal(signal.SIGINT, signal_handler)
-
-# Main function for standalone testing
-def main():
-    logger.info("LDR Sensor Monitoring Started")
-    logger.info("Press CTRL+C to exit")
-    logger.info("----------------------------------------")
-    
-    # Load configuration
-    config = load_config()
-    simulation = config["sensors"].get("simulation", False)
-    ldr_config = config["sensors"]["pins"].get("ldr", {"channel": 1, "min_value": 0, "max_value": 1023})
-    
-    # Initialize sensor
-    sensor = LDRSensor(
-        channel=ldr_config.get("channel", 1),
-        min_value=ldr_config.get("min_value", 0),
-        max_value=ldr_config.get("max_value", 1023),
-        simulation=simulation
-    )
-    
-    try:
-        logger.info(f"Using channel: {sensor.channel}")
-        logger.info(f"Simulation mode: {sensor.simulation}")
-        
-        # Main loop
-        while True:
-            # Read raw value
-            raw_value = sensor.read_channel()
-            
-            # Convert to percentage
-            percentage = sensor.get_light_percentage()
-            
-            # Display values
-            logger.info(f"Raw: {raw_value} | Light: {percentage:.1f}% | Channel: {sensor.channel}")
-            time.sleep(1)
-    except KeyboardInterrupt:
-        logger.info("\Program terminated.")
-    except Exception as e:
-        logger.error(f"An error occurred: {e}")
-    finally:
-        # Clean shutdown
-        sensor.close()
-        logger.info("SPI connection closed")
-
-# Run the main function if this script is executed directly
+# Only run the test code when this file is executed directly, not when imported
 if __name__ == "__main__":
-    main()
+    try:
+        while True:
+            # Read raw analog value from LDR connected to the specified channel
+            ldr_raw = read_channel(LDR_CHANNEL)
+            
+            # Convert raw value to light percentage
+            ldr_percent = convert_to_percent(ldr_raw, LDR_MIN, LDR_MAX)
+            
+            time.sleep(1)  # Wait for 1 second before next reading
+            
+    except KeyboardInterrupt:
+        # Clean shutdown on Ctrl+C
+        spi.close()  # Release SPI resources
+        print("\nExiting...")

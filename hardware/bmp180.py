@@ -3,274 +3,168 @@ import time
 from ctypes import c_short
 import signal
 import sys
-import json
-import os
-import logging
 
-logger = logging.getLogger(__name__)
+# Configuration
+DEVICE = 0x77  # I2C address of BMP180 sensor
+bus = smbus.SMBus(1)  # Use I2C bus 1 on Raspberry Pi
 
-class BMP180Sensor:
-    """BMP180 pressure and temperature sensor interface."""
-    
-    def __init__(self, i2c_address=0x77, i2c_bus=1, simulation=False, max_retries=3, timeout=1.0):
-        """Initialize the BMP180 sensor.
-        
-        Args:
-            i2c_address: I2C address of the sensor (default: 0x77)
-            i2c_bus: I2C bus to use (default: 1 for Raspberry Pi)
-            simulation: Whether to simulate readings
-            max_retries: Maximum number of retries for I2C operations
-            timeout: Timeout in seconds for I2C operations
-        """
-        self.i2c_address = i2c_address
-        self.i2c_bus = i2c_bus
-        self.simulation = simulation
-        self.bus = None
-        self.max_retries = max_retries
-        self.timeout = timeout
-        
-        if not simulation:
-            try:
-                self.bus = smbus.SMBus(i2c_bus)
-                # Test if sensor is reachable with timeout
-                self._with_timeout(self.read_id)
-            except (ImportError, IOError, OSError, TimeoutError) as e:
-                logger.error(f"Error initializing BMP180: {e}")
-                self.simulation = True
-                logger.info("Using simulation mode for BMP180 sensor")
-    
-    def _with_timeout(self, func, *args, **kwargs):
-        """Execute a function with a timeout."""
-        # Define a timeout handler
-        def timeout_handler(signum, frame):
-            raise TimeoutError(f"Operation timed out after {self.timeout} seconds")
-        
-        # Set up the timeout
-        old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-        signal.setitimer(signal.ITIMER_REAL, self.timeout)
-        
-        try:
-            # Execute the function
-            result = func(*args, **kwargs)
-            return result
-        finally:
-            # Reset the timeout
-            signal.setitimer(signal.ITIMER_REAL, 0)
-            signal.signal(signal.SIGALRM, old_handler)
-    
-    def _with_retry(self, func, *args, **kwargs):
-        """Execute a function with retries."""
-        last_exception = None
-        for attempt in range(self.max_retries):
-            try:
-                return self._with_timeout(func, *args, **kwargs)
-            except (IOError, OSError, TimeoutError) as e:
-                last_exception = e
-                logger.warning(f"Retry {attempt+1}/{self.max_retries} failed: {e}")
-                time.sleep(0.1)  # Short delay between retries
-        
-        # If we get here, all retries failed
-        logger.error(f"All {self.max_retries} retries failed: {last_exception}")
-        raise last_exception
-    
-    def get_short(self, data, index):
-        """Combine two bytes and return signed 16-bit value."""
-        return c_short((data[index] << 8) + data[index + 1]).value
+def getShort(data, index):
+    # Combine two bytes and return signed 16-bit value
+    return c_short((data[index] << 8) + data[index + 1]).value
 
-    def get_ushort(self, data, index):
-        """Combine two bytes and return unsigned 16-bit value."""
-        return (data[index] << 8) + data[index + 1]
-    
-    def read_id(self):
-        """Read chip ID and version from the sensor."""
-        if self.simulation:
-            return (0x55, 0x01)  # Simulated values
-        
-        REG_ID = 0xD0
-        try:
-            (chip_id, chip_version) = self.bus.read_i2c_block_data(self.i2c_address, REG_ID, 2)
-            return (chip_id, chip_version)
-        except Exception as e:
-            logger.error(f"Error reading BMP180 ID: {e}")
-            self.simulation = True
-            return (0, 0)
-    
-    def read(self):
-        """Read temperature, pressure, and altitude from the sensor."""
-        if self.simulation:
-            # Return simulated values
-            import random
-            temperature = round(random.uniform(18.0, 25.0), 1)
-            pressure = round(random.uniform(990.0, 1020.0), 1)
-            altitude = round(random.uniform(100.0, 120.0), 1)
-            return (temperature, pressure, altitude)
-        
-        # Register addresses
-        REG_CALIB  = 0xAA
-        REG_MEAS   = 0xF4
-        REG_MSB    = 0xF6
-        REG_LSB    = 0xF7
-        CRV_TEMP   = 0x2E
-        CRV_PRES   = 0x34
-        OVERSAMPLE = 3  # Oversampling setting (0-3)
+def getUshort(data, index):
+    # Combine two bytes and return unsigned 16-bit value
+    return (data[index] << 8) + data[index + 1]
 
-        try:
-            # Use retry mechanism for all I2C operations
-            def read_calibration():
-                return self.bus.read_i2c_block_data(self.i2c_address, REG_CALIB, 22)
-            
-            # Read calibration data with retry
-            cal = self._with_retry(read_calibration)
+def readBmp180Id(addr=DEVICE):
+    # Read chip ID and version from the sensor
+    REG_ID = 0xD0
+    (chip_id, chip_version) = bus.read_i2c_block_data(addr, REG_ID, 2)
+    return (chip_id, chip_version)
 
-            # Convert bytes to calibration values
-            AC1 = self.get_short(cal, 0)
-            AC2 = self.get_short(cal, 2)
-            AC3 = self.get_short(cal, 4)
-            AC4 = self.get_ushort(cal, 6)
-            AC5 = self.get_ushort(cal, 8)
-            AC6 = self.get_ushort(cal, 10)
-            B1  = self.get_short(cal, 12)
-            B2  = self.get_short(cal, 14)
-            MB  = self.get_short(cal, 16)
-            MC  = self.get_short(cal, 18)
-            MD  = self.get_short(cal, 20)
+def readBmp180(addr=DEVICE):
+    # Register addresses
+    REG_CALIB  = 0xAA
+    REG_MEAS   = 0xF4
+    REG_MSB    = 0xF6
+    REG_LSB    = 0xF7
+    CRV_TEMP   = 0x2E
+    CRV_PRES   = 0x34
+    OVERSAMPLE = 3  # Oversampling setting (0-3)
 
-            # Request temperature measurement with retry
-            def request_temp():
-                self.bus.write_byte_data(self.i2c_address, REG_MEAS, CRV_TEMP)
-                time.sleep(0.005)  # Wait for measurement
-            
-            self._with_retry(request_temp)
-            
-            # Read temperature with retry
-            def read_temp():
-                return self.bus.read_i2c_block_data(self.i2c_address, REG_MSB, 2)
-            
-            temp_data = self._with_retry(read_temp)
-            msb, lsb = temp_data
-            UT = (msb << 8) + lsb
+    # Read calibration data from the sensor
+    cal = bus.read_i2c_block_data(addr, REG_CALIB, 22)
 
-            # Request pressure measurement with retry
-            def request_pressure():
-                self.bus.write_byte_data(self.i2c_address, REG_MEAS, CRV_PRES + (OVERSAMPLE << 6))
-                time.sleep(0.04)  # Wait for measurement
-            
-            self._with_retry(request_pressure)
-            
-            # Read pressure with retry
-            def read_pressure():
-                return self.bus.read_i2c_block_data(self.i2c_address, REG_MSB, 3)
-            
-            pressure_data = self._with_retry(read_pressure)
-            msb, lsb, xsb = pressure_data
-            UP = ((msb << 16) + (lsb << 8) + xsb) >> (8 - OVERSAMPLE)
+    # Convert bytes to calibration values
+    AC1 = getShort(cal, 0)
+    AC2 = getShort(cal, 2)
+    AC3 = getShort(cal, 4)
+    AC4 = getUshort(cal, 6)
+    AC5 = getUshort(cal, 8)
+    AC6 = getUshort(cal, 10)
+    B1  = getShort(cal, 12)
+    B2  = getShort(cal, 14)
+    MB  = getShort(cal, 16)
+    MC  = getShort(cal, 18)
+    MD  = getShort(cal, 20)
 
-            # Calculate true temperature
-            X1 = ((UT - AC6) * AC5) >> 15
-            X2 = int((MC << 11) / (X1 + MD))
-            B5 = X1 + X2
-            temperature = int(B5 + 8) >> 4
-            temperature = temperature / 10.0
+    # Request temperature measurement
+    bus.write_byte_data(addr, REG_MEAS, CRV_TEMP)
+    time.sleep(0.005)  # Wait for measurement
+    msb, lsb = bus.read_i2c_block_data(addr, REG_MSB, 2)
+    UT = (msb << 8) + lsb
 
-            # Calculate true pressure
-            B6 = B5 - 4000
-            X1 = (B2 * (B6 * B6 >> 12)) >> 11
-            X2 = (AC2 * B6) >> 11
-            X3 = X1 + X2
-            B3 = (((AC1 * 4 + X3) << OVERSAMPLE) + 2) >> 2
-            X1 = (AC3 * B6) >> 13
-            X2 = (B1 * (B6 * B6 >> 12)) >> 16
-            X3 = ((X1 + X2) + 2) >> 2
-            B4 = (AC4 * (X3 + 32768)) >> 15
-            B7 = (UP - B3) * (50000 >> OVERSAMPLE)
+    # Request pressure measurement
+    bus.write_byte_data(addr, REG_MEAS, CRV_PRES + (OVERSAMPLE << 6))
+    time.sleep(0.04)  # Wait for measurement
+    msb, lsb, xsb = bus.read_i2c_block_data(addr, REG_MSB, 3)
+    UP = ((msb << 16) + (lsb << 8) + xsb) >> (8 - OVERSAMPLE)
 
-            if B7 < 0x80000000:
-                P = (B7 * 2) // B4
-            else:
-                P = (B7 // B4) * 2
+    # Calculate true temperature
+    X1 = ((UT - AC6) * AC5) >> 15
+    X2 = int((MC << 11) / (X1 + MD))
+    B5 = X1 + X2
+    temperature = int(B5 + 8) >> 4
+    temperature = temperature / 10.0
 
-            X1 = (P >> 8) * (P >> 8)
-            X1 = (X1 * 3038) >> 16
-            X2 = (-7357 * P) >> 16
-            pressure = P + ((X1 + X2 + 3791) >> 4)
-            pressure = pressure / 100.0  # Convert to hPa
+    # Calculate true pressure
+    B6 = B5 - 4000
+    X1 = (B2 * (B6 * B6 >> 12)) >> 11
+    X2 = (AC2 * B6) >> 11
+    X3 = X1 + X2
+    B3 = (((AC1 * 4 + X3) << OVERSAMPLE) + 2) >> 2
+    X1 = (AC3 * B6) >> 13
+    X2 = (B1 * (B6 * B6 >> 12)) >> 16
+    X3 = ((X1 + X2) + 2) >> 2
+    B4 = (AC4 * (X3 + 32768)) >> 15
+    B7 = (UP - B3) * (50000 >> OVERSAMPLE)
 
-            # Calculate altitude using pressure
-            altitude = 44330.0 * (1.0 - pow(pressure / 1013.25, 1.0 / 5.255))
-            altitude = round(altitude, 2)
+    if B7 < 0x80000000:
+        P = (B7 * 2) // B4
+    else:
+        P = (B7 // B4) * 2
 
-            return (temperature, pressure, altitude)
-        except Exception as e:
-            logger.error(f"Error reading BMP180 sensor: {e}")
-            # Return simulated values on error
-            import random
-            temperature = round(random.uniform(18.0, 25.0), 1)
-            pressure = round(random.uniform(990.0, 1020.0), 1)
-            altitude = round(random.uniform(100.0, 120.0), 1)
-            return (temperature, pressure, altitude)
+    X1 = (P >> 8) * (P >> 8)
+    X1 = (X1 * 3038) >> 16
+    X2 = (-7357 * P) >> 16
+    pressure = P + ((X1 + X2 + 3791) >> 4)
+    pressure = pressure / 100.0  # Convert to hPa
 
-# Function to load configuration
-def load_config():
-    config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'hardware.json')
-    try:
-        with open(config_path, 'r') as f:
-            config = json.load(f)
-        return config
-    except Exception as e:
-        logger.error(f"Error loading configuration: {e}")
-        return {"sensors": {"simulation": True, "pins": {"bmp180": {"i2c_address": "0x77", "i2c_bus": 1}}}}
+    # Calculate altitude using pressure
+    altitude = 44330.0 * (1.0 - pow(pressure / 1013.25, 1.0 / 5.255))
+    altitude = round(altitude, 2)
 
-# Main function for standalone testing
-def main():
-    logger.info("BMP180 Sensor Monitoring Started")
-    logger.info("Press CTRL+C to exit")
-    logger.info("----------------------------------------")
-    
-    # Load configuration
-    config = load_config()
-    simulation = config["sensors"].get("simulation", False)
-    bmp_config = config["sensors"]["pins"].get("bmp180", {"i2c_address": "0x77", "i2c_bus": 1})
-    
-    # Convert hex string to int if needed
-    i2c_address = int(bmp_config["i2c_address"], 16) if isinstance(bmp_config["i2c_address"], str) else bmp_config["i2c_address"]
-    
-    # Initialize sensor
-    sensor = BMP180Sensor(
-        i2c_address=i2c_address,
-        i2c_bus=bmp_config["i2c_bus"],
-        simulation=simulation
-    )
-    
-    try:
-        # Read and display chip ID and version
-        chip_id, chip_version = sensor.read_id()
-        logger.info(f"Chip ID: {chip_id}, Version: {chip_version}")
-        logger.info(f"Simulation mode: {sensor.simulation}")
-        
-        # Main loop
-        while True:
-            try:
-                temperature, pressure, altitude = sensor.read()
-                logger.info(f"Temperature: {temperature:.1f} °C")
-                logger.info(f"Pressure: {pressure:.1f} hPa")
-                logger.info(f"Altitude: {altitude:.1f} m")
-                logger.info("----------------------------------------")
-            except OSError as e:
-                logger.error(f"Error reading sensor: {e}")
-                
-            time.sleep(1)
-    except KeyboardInterrupt:
-        logger.info("\Program terminated.")
-    except Exception as e:
-        logger.error(f"An error occurred: {e}")
+    return (temperature, pressure, altitude)
 
 # Function to handle clean exit
 def signal_handler(sig, frame):
-    print("\Program terminated.")
     sys.exit(0)
 
 # Register signal handler for clean exit
 signal.signal(signal.SIGINT, signal_handler)
+
+# Add a BMP180Sensor class for better integration with other files
+class BMP180Sensor:
+    """BMP180 pressure, temperature and altitude sensor interface."""
+    
+    def __init__(self, i2c_address=DEVICE, i2c_bus=1, simulation=False):
+        """Initialize the BMP180 sensor."""
+        self.i2c_address = i2c_address
+        self.i2c_bus = i2c_bus
+        self.simulation = simulation
+        
+        if not simulation:
+            try:
+                # Try to initialize the I2C bus
+                global bus
+                bus = smbus.SMBus(i2c_bus)
+            except (ImportError, IOError):
+                self.simulation = True
+    
+    def read(self):
+        """Read sensor data and return temperature, pressure, and altitude."""
+        if self.simulation:
+            # Return simulated values
+            import random
+            temperature = round(random.uniform(18.0, 25.0), 1)
+            pressure = round(random.uniform(980.0, 1050.0), 1)
+            altitude = round(random.uniform(0.0, 100.0), 2)
+            return (temperature, pressure, altitude)
+        
+        try:
+            return readBmp180(self.i2c_address)
+        except Exception:
+            # Return simulated values on error
+            import random
+            temperature = round(random.uniform(18.0, 25.0), 1)
+            pressure = round(random.uniform(980.0, 1050.0), 1)
+            altitude = round(random.uniform(0.0, 100.0), 2)
+            return (temperature, pressure, altitude)
+    
+    def get_temperature(self):
+        """Get the current temperature in °C."""
+        return self.read()[0]
+    
+    def get_pressure(self):
+        """Get the current pressure in hPa."""
+        return self.read()[1]
+    
+    def get_altitude(self):
+        """Get the current altitude in meters."""
+        return self.read()[2]
+
+# Main function
+def main():
+    try:
+        # Read and display chip ID and version
+        chip_id, chip_version = readBmp180Id()
+        
+        # Main loop
+        while True:
+            temperature, pressure, altitude = readBmp180()
+            time.sleep(1)
+    except Exception:
+        pass
 
 # Run the main function if this script is executed directly
 if __name__ == "__main__":
