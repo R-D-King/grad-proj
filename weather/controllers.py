@@ -9,6 +9,7 @@ import logging
 # Import the sensor controller
 from hardware.sensor_controller import SensorController
 from hardware.lcd_16x2 import LCD
+import subprocess
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -105,9 +106,9 @@ def lcd_update_loop(app):
         lambda: (f"Temp: {sensor_controller.get_latest_readings().get('temperature', 0):.1f}C", 
                 f"Humid: {sensor_controller.get_latest_readings().get('humidity', 0):.1f}%"),
         
-        # Mode 2: Soil Moisture and Water Level
-        lambda: (f"Soil: {sensor_controller.get_latest_readings().get('soil_moisture', 0):.1f}%", 
-                f"Water: {sensor_controller.get_latest_readings().get('water_level', 0):.1f}%"),
+        # Mode 2: Soil Moisture
+        lambda: (f"Soil Moisture:", 
+                f"{sensor_controller.get_latest_readings().get('soil_moisture', 0):.1f}%"),
         
         # Mode 3: Pressure from BMP180
         lambda: (f"Pressure:", 
@@ -119,7 +120,11 @@ def lcd_update_loop(app):
                 
         # Mode 5: Rain Percentage
         lambda: (f"Rain Level:", 
-                f"{sensor_controller.get_latest_readings().get('rain', 0):.1f}%")
+                f"{sensor_controller.get_latest_readings().get('rain', 0):.1f}%"),
+                
+        # Mode 6: Network Name (SSID)
+        lambda: (f"Network:", 
+                f"{get_network_ssid()}")
     ]
     
     current_mode = 0
@@ -187,3 +192,18 @@ def update_weather_data(data=None):
     socketio.emit('weather_update', weather_data.to_dict())
     
     return weather_data.to_dict()
+
+
+def get_network_ssid():
+    """Get the SSID of the connected WiFi network."""
+    try:
+        if platform.system() == "Linux":
+            # For Raspberry Pi / Linux
+            result = subprocess.check_output(['iwgetid', '-r']).decode('utf-8').strip()
+            return result if result else "Not connected"
+        else:
+            # For Windows (simulation mode)
+            return "Simulation SSID"
+    except Exception as e:
+        logger.error(f"Error getting network SSID: {e}")
+        return "Unknown"

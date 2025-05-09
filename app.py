@@ -35,6 +35,20 @@ def get_ip_address():
         print(f"Error getting IP address: {e}")
         return '127.0.0.1'  # Fallback to localhost
 
+def get_network_ssid():
+    """Get the SSID of the connected WiFi network."""
+    try:
+        if platform.system() == "Linux":
+            # For Raspberry Pi / Linux
+            result = subprocess.check_output(['iwgetid', '-r']).decode('utf-8').strip()
+            return result if result else "Not connected"
+        else:
+            # For Windows (simulation mode)
+            return "Simulation SSID"
+    except Exception as e:
+        print(f"Error getting network SSID: {e}")
+        return "Unknown"
+
 def create_app(config_class=Config):
     # Initialize configuration
     config = config_class()
@@ -127,8 +141,12 @@ if __name__ == '__main__':
     # Get the device's IP address
     ip_address = get_ip_address()
     
-    # Store IP address in app config for LCD display
+    # Get the network SSID
+    network_ssid = get_network_ssid()
+    
+    # Store IP address and network SSID in app config for LCD display
     app.config['IP_ADDRESS'] = ip_address
+    app.config['NETWORK_SSID'] = network_ssid
     
     # Run the application
     host = config.get('HOST', '0.0.0.0')
