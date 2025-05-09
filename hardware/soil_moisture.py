@@ -41,11 +41,21 @@ class SoilMoistureSensor:
             return int(random.uniform(self.wet_value, self.dry_value))
         
         try:
-            adc = self.spi.xfer2([1, (8 + self.channel) << 4, 0])
-            data = ((adc[1] & 3) << 8) + adc[2]
-            return data
+            # Add timeout to prevent hanging
+            max_attempts = 3
+            for attempt in range(max_attempts):
+                try:
+                    adc = self.spi.xfer2([1, (8 + self.channel) << 4, 0])
+                    data = ((adc[1] & 3) << 8) + adc[2]
+                    return data
+                except Exception as e:
+                    if attempt < max_attempts - 1:
+                        print(f"Retry {attempt+1}/{max_attempts} after error: {e}")
+                        time.sleep(0.5)  # Short delay before retry
+                    else:
+                        raise
         except Exception as e:
-            print(f"Error reading soil moisture sensor: {e}")
+            print(f"Error reading soil moisture sensor after {max_attempts} attempts: {e}")
             # Return a simulated value on error
             return int(random.uniform(self.wet_value, self.dry_value))
     

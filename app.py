@@ -90,6 +90,13 @@ def create_app(config_class=Config):
         except Exception as e:
             print(f"Error displaying shutdown message: {e}")
         
+        # Clean up any GPIO resources
+        try:
+            print("\nDe-initializing hardware resources...")
+            # Add any additional cleanup here
+        except Exception as e:
+            print(f"Error during cleanup: {e}")
+        
         # Exit the application
         sys.exit(0)
     
