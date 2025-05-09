@@ -372,63 +372,43 @@ class SensorController:
             time.sleep(self.ui_update_interval)
     
     def _db_monitoring_loop(self):
-        """Background thread for database sensor readings."""
+        """Background thread for updating database with sensor readings."""
         while self.running:
             try:
-                # Check if it's time for a database update
-                current_time = time.time()
-                if current_time - self.last_db_update >= self.db_update_interval:
-                    # Get the latest readings
-                    readings = self.get_latest_readings()
-                    
-                    # Update the database - use app context
-                    if self.app:
-                        with self.app.app_context():
-                            from weather.models import WeatherData
-                            from shared.database import db
-                            
-                            # Ensure we have valid values for required fields
-                            temperature = readings.get('temperature')
-                            humidity = readings.get('humidity')
-                            soil_moisture = readings.get('soil_moisture', 0)
-                            
-                            # Only insert into database if we have valid temperature and humidity
-                            if temperature is not None and humidity is not None:
-                                # Make sure values are numeric
-                                try:
-                                    temp_value = float(temperature)
-                                    humidity_value = float(humidity)
-                                    soil_value = float(soil_moisture) if soil_moisture is not None else 0.0
-                                    
-                                    # Create new weather data entry
-                                    weather_data = WeatherData(
-                                        temperature=temp_value,
-                                        humidity=humidity_value,
-                                        soil_moisture=soil_value,
-                                        pressure=0.0  # We don't have a pressure sensor
-                                    )
-                                    db.session.add(weather_data)
-                                    db.session.commit()
-                                    
-                                    # Emit via socketio if available
-                                    if self.socketio:
-                                        self.socketio.emit('weather_update', weather_data.to_dict())
-                                    
-                                    # Update the timestamp
-                                    self.last_db_update = current_time
-                                    logger.debug("Updated database with sensor readings")
-                                except (ValueError, TypeError) as e:
-                                    logger.error(f"Invalid sensor values: {e}, temperature={temperature}, humidity={humidity}")
-                            else:
-                                logger.warning("Skipping database update due to missing temperature or humidity data")
-                        
-                    else:
-                        logger.error("Cannot update database: Flask app not set")
+                # Get current time
+                now = time.time()
                 
+                # Check if it's time to update the database
+                if now - self.last_db_update >= self.db_update_interval:
+                    # Get latest readings
+                    readings = self.read_all()
+                    
+                    # Update database with readings
+                    with self.app.app_context():
+                        from weather.controllers import update_weather_data
+                        
+                        # Even if temperature or humidity is None, still update other values
+                        update_data = {
+                            'temperature': readings.get('temperature', 0),
+                            'humidity': readings.get('humidity', 0),
+                            'soil_moisture': readings.get('soil_moisture', 0),
+                            'pressure': readings.get('pressure', 0),
+                            'light': readings.get('light', 0),
+                            'rain': readings.get('rain', 0)
+                        }
+                        
+                        # Log what we're updating
+                        logger.info(f"Updating database with sensor readings: {update_data}")
+                        
+                        # Update the database
+                        update_weather_data(update_data)
+                    
+                    # Update last database update time
+                    self.last_db_update = now
             except Exception as e:
-                logger.error(f"Error in DB sensor monitoring loop: {e}")
+                logger.error(f"Error in database monitoring loop: {e}")
             
-            # Sleep for a short interval to check again
+            # Sleep for a short time to avoid high CPU usage
             time.sleep(1)
     
     def update_readings(self):

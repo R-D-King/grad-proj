@@ -98,7 +98,7 @@ def create_app(config_class=Config):
             GPIO.cleanup()
             
             # Close any open I2C bus connections
-            from hardware.sensor_controller import sensor_controller
+            from weather.controllers import sensor_controller
             if hasattr(sensor_controller, 'sensors'):
                 for sensor_name, sensor in sensor_controller.sensors.items():
                     if hasattr(sensor, 'bus') and sensor.bus is not None:

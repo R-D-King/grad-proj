@@ -308,6 +308,10 @@ if __name__ == "__main__":
 
 def display_shutdown(self):
     """Display shutdown message on the LCD."""
+    lcd = get_lcd_instance()
+    lcd.clear()
+    lcd.write_string("System", 0, 0)
+    lcd.write_string("Shutting Down...", 1, 0)
     try:
         self.clear()
         self.write_string("System Shutdown", 0, 0)

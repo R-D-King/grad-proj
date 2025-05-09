@@ -115,11 +115,11 @@ def lcd_update_loop(app):
         
         # Mode 4: Light Percentage from LDR
         lambda: (f"Light Level:", 
-                f"{sensor_controller.get_latest_readings().get('light_percentage', 0):.1f}%"),
+                f"{sensor_controller.get_latest_readings().get('light', 0):.1f}%"),
                 
         # Mode 5: Rain Percentage
         lambda: (f"Rain Level:", 
-                f"{sensor_controller.get_latest_readings().get('rain_percentage', 0):.1f}%")
+                f"{sensor_controller.get_latest_readings().get('rain', 0):.1f}%")
     ]
     
     current_mode = 0
