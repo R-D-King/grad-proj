@@ -1,6 +1,6 @@
 import logging
 import time
-from shared.config import get_config
+from shared.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +12,7 @@ class Relay:
         self.pin = pin
         self.simulated = simulated
         self.state = False  # Default state is OFF
+        self.config = Config()  # Create an instance of the Config class
         
         if not simulated and pin is not None:
             try:

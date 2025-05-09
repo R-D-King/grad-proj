@@ -43,8 +43,6 @@ def install_rpi_system_packages():
         print(f"Error installing system packages: {e}")
         return False
 
-# In the setup_environment function, update the pip installation part:
-
 def setup_environment():
     """Set up the Python environment for the project."""
     print("Setting up the environment...")
@@ -66,14 +64,18 @@ def setup_environment():
         except subprocess.CalledProcessError:
             print("Error: Failed to create virtual environment.")
             sys.exit(1)
+    else:
+        print("Virtual environment already exists.")
     
     # Determine the pip executable in the virtual environment
     if platform.system() == "Windows":
         pip_executable = os.path.join("venv", "Scripts", "pip")
         python_executable = os.path.join("venv", "Scripts", "python")
+        activate_cmd = os.path.join("venv", "Scripts", "activate")
     else:
         pip_executable = os.path.join("venv", "bin", "pip")
         python_executable = os.path.join("venv", "bin", "python")
+        activate_cmd = os.path.join("venv", "bin", "activate")
     
     # Detect if running on Raspberry Pi
     is_rpi = is_raspberry_pi()
@@ -93,7 +95,7 @@ def setup_environment():
         sys.exit(1)
     
     # Upgrade pip first to avoid issues
-    print("Upgrading pip...")
+    print("Upgrading pip in virtual environment...")
     try:
         subprocess.check_call([pip_executable, "install", "--upgrade", "pip"])
         print("Pip upgraded successfully.")
@@ -101,11 +103,11 @@ def setup_environment():
         print("Warning: Failed to upgrade pip. Continuing with installation...")
     
     # Install dependencies in the virtual environment
-    print(f"Installing dependencies from {requirements_file}...")
+    print(f"Installing dependencies from {requirements_file} into virtual environment...")
     try:
         # Use --no-cache-dir to avoid caching issues
         subprocess.check_call([pip_executable, "install", "--no-cache-dir", "-r", requirements_file])
-        print("Dependencies installed successfully.")
+        print("Dependencies installed successfully in virtual environment.")
     except subprocess.CalledProcessError as e:
         print(f"Error: Failed to install dependencies: {e}")
         
@@ -123,13 +125,16 @@ def setup_environment():
         os.makedirs("instance")
         print("Created instance directory.")
     
-    print("Setup completed successfully!")
-    print("\nTo run the application, activate the virtual environment and run app.py:")
+    print("\n✅ Setup completed successfully!")
+    print("\nTo run the application:")
+    print("1. Activate the virtual environment:")
     if platform.system() == "Windows":
-        print("venv\\Scripts\\activate")
+        print(f"   {activate_cmd}")
     else:
-        print("source venv/bin/activate")
-    print("python app.py")
+        print(f"   source {activate_cmd}")
+    print("2. Start the application:")
+    print("   python app.py")
+    print("\nThe web interface will be available at http://localhost:5000")
 
 if __name__ == "__main__":
     setup_environment()

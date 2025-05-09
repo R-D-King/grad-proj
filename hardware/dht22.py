@@ -3,14 +3,17 @@ import board
 import time
 import signal
 import sys
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Define sensor type and pin (using BCM pin numbering)
-DHT_PIN = 4
+DHT_PIN = 26
 dht_sensor = adafruit_dht.DHT22(getattr(board, f"D{DHT_PIN}"))
 
 # Function to handle clean exit
 def signal_handler(sig, frame):
-    print("\nProgram terminated.")
+    logger.info("\nProgram terminated.")
     # Clean up resources
     dht_sensor.exit()
     sys.exit(0)
@@ -20,8 +23,8 @@ signal.signal(signal.SIGINT, signal_handler)
 
 # Main loop
 try:
-    print("DHT22 Sensor Reading (Press CTRL+C to exit)")
-    print("----------------------------------------")
+    logger.info("DHT22 Sensor Reading (Press CTRL+C to exit)")
+    logger.info("----------------------------------------")
     
     while True:
         try:
@@ -29,23 +32,23 @@ try:
             humidity = dht_sensor.humidity
             
             if humidity is not None and temperature is not None:
-                print(f"Temperature: {temperature:.1f}°C")
-                print(f"Humidity: {humidity:.1f}%")
+                logger.info(f"Temperature: {temperature:.1f}°C")
+                logger.info(f"Humidity: {humidity:.1f}%")
             else:
-                print("Failed to read data from sensor")
+                logger.error("Failed to read data from sensor")
             
-            print("----------------------------------------")
+            logger.info("----------------------------------------")
         except RuntimeError as e:
             # DHT sensors sometimes fail to read, just try again
-            print(f"Reading error: {e}")
+            logger.error(f"Reading error: {e}")
         
         time.sleep(2)  # DHT22 needs at least 2 seconds between readings
 
 except Exception as e:
-    print(f"An error occurred: {e}")
+    logger.error(f"An error occurred: {e}")
 finally:
     # This will run on any exit except when CTRL+C is pressed (which is handled by signal_handler)
-    print("Program ended.")
+    logger.info("Program ended.")
     try:
         dht_sensor.exit()
     except:

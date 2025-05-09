@@ -18,7 +18,8 @@ A web-based irrigation system with weather monitoring capabilities.
 
 ### Standard Setup
 1. Make sure you have Python 3.8+ installed
-2. Run the setup script: ```python setup.py```
+2. Run the setup script to create a virtual environment and install dependencies:
+   ```python setup.py```
 3. Activate the virtual environment:
    - Windows: ```venv\Scripts\activate```
    - Linux/Mac: ```source venv/bin/activate```
@@ -31,7 +32,8 @@ A web-based irrigation system with weather monitoring capabilities.
    - DHT22 temperature/humidity sensor to GPIO pin 4
    - Soil moisture sensor to SPI interface (MCP3008 ADC on channel 0)
    - Water level sensor to GPIO pin 17
-3. Run the setup script: ```python setup.py```
+3. Run the setup script to create a virtual environment and install dependencies:
+   ```python setup.py```
 4. Activate the virtual environment: ```source venv/bin/activate```
 5. Start the application: ```python app.py```
 6. Access the web interface by navigating to your Raspberry Pi's IP address on port 5000

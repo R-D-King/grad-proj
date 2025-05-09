@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 class WaterLevelSensor:
     """Water level sensor interface."""
     
@@ -20,7 +24,7 @@ class WaterLevelSensor:
                 self.gpio = GPIO
             except (ImportError, RuntimeError):
                 self.simulation = True
-                print("GPIO not available, using simulation mode for water level sensor")
+                logger.info("GPIO not available, using simulation mode for water level sensor")
     
     def get_level(self):
         """Get the current water level as a percentage."""
