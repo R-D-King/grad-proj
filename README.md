@@ -16,6 +16,7 @@ A web-based irrigation system with weather monitoring capabilities.
 - Light level monitoring with LDR sensor
 - Rain detection with rain sensor
 - Pressure and altitude monitoring with BMP180 sensor
+- LCD display for system status and sensor readings
 - Sensor simulation mode for development and testing
 
 ## Setup
@@ -39,6 +40,7 @@ A web-based irrigation system with weather monitoring capabilities.
    - Light sensor (LDR) to MCP3008 ADC on channel 1
    - Rain sensor to MCP3008 ADC on channel 2
    - BMP180 pressure sensor to I2C bus
+   - LCD display to GPIO pins (RS: 25, E: 24, Data: [23, 17, 18, 22])
 3. Run the setup script to create a virtual environment and install dependencies:
    ```python setup.py```
 4. Activate the virtual environment: ```source venv/bin/activate```
@@ -56,7 +58,7 @@ A web-based irrigation system with weather monitoring capabilities.
 - Rain sensor with analog output
 - BMP180 pressure and temperature sensor
 - Relay module for pump control
-- 16x2 LCD display (optional)
+- 16x2 LCD display for system status and sensor readings
 
 ## Project Structure
 
@@ -71,7 +73,7 @@ A web-based irrigation system with weather monitoring capabilities.
   - `models.py` - Database models for irrigation
   - `routes.py` - API endpoints for irrigation
 - `weather/` - Weather monitoring functionality
-  - `controllers.py` - Weather data processing
+  - `controllers.py` - Weather data processing and LCD display control
   - `models.py` - Database models for weather data
   - `routes.py` - API endpoints for weather
 - `reports/` - Report generation functionality
@@ -90,7 +92,7 @@ A web-based irrigation system with weather monitoring capabilities.
   - `dht22.py` - DHT22 temperature and humidity sensor interface
   - `bmp180.py` - BMP180 pressure and temperature sensor interface
   - `ldr_aout.py` - Light dependent resistor sensor interface
-  - `rain-aout.py` - Rain sensor interface
+  - `rain_aout.py` - Rain sensor interface
   - `lcd_16x2.py` - 16x2 LCD display interface
   - `sensor_controller.py` - Unified sensor management
   - `sensor_simulation.py` - Sensor simulation for development
@@ -162,6 +164,19 @@ The application includes a simulation mode for development and testing without p
 - Simulated values will vary slightly over time to mimic real sensor behavior
 - The LCD display will show simulated output in the console
 
+## LCD Display
+
+The system includes a 16x2 LCD display that shows:
+- Network name (SSID) and IP address on startup
+- Temperature and humidity readings
+- Soil moisture levels
+- Pressure readings from BMP180 sensor
+- Light levels from LDR sensor
+- Rain detection from rain sensor
+- System shutdown message when the application is terminated
+
+The display cycles through different screens, showing various sensor readings and system information.
+
 ## Resolved Issues
 
 The following issues have been fixed:
@@ -189,6 +204,16 @@ The following issues have been fixed:
 6. Sensor Simulation:
    - ✅ Added missing sensor simulation module
    - ✅ Fixed import error for SimulatedSensor class
+
+7. Sensor Integration:
+   - ✅ Implemented class-based interfaces for BMP180, LDR, and Rain sensors
+   - ✅ Added proper error handling for sensor readings
+   - ✅ Integrated sensor readings with LCD display
+
+8. LCD Display:
+   - ✅ Added shutdown message display
+   - ✅ Implemented cycling display of all sensor readings
+   - ✅ Fixed formatting issues with sensor data display
 
 ## Known Issues
 
@@ -252,6 +277,11 @@ Similarly, the LDR sensor may need calibration for your lighting conditions:
 1. Test the sensor in complete darkness and note the reading
 2. Test the sensor in bright light and note the reading
 3. Update the `min_value` and `max_value` parameters in `hardware/ldr_aout.py`
+
+The rain sensor also requires calibration:
+1. Test the sensor when completely dry and note the reading
+2. Test the sensor when wet and note the reading
+3. Update the `DRY_VALUE` and `WET_VALUE` constants in `hardware/rain_aout.py`
 
 # Configuration
 
