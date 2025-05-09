@@ -3,6 +3,9 @@ import eventlet
 eventlet.monkey_patch()
 
 # Now import Flask and other modules
+import signal
+import sys
+import time    # For the sleep function in signal handler
 from flask import Flask, render_template, request, has_request_context
 from shared.database import db
 from shared.socketio import socketio
