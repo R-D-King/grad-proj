@@ -387,14 +387,14 @@ class SensorController:
                     with self.app.app_context():
                         from weather.controllers import update_weather_data
                         
-                        # Even if temperature or humidity is None, still update other values
+                        # Handle None values by providing default values
                         update_data = {
-                            'temperature': readings.get('temperature', 0),
-                            'humidity': readings.get('humidity', 0),
-                            'soil_moisture': readings.get('soil_moisture', 0),
-                            'pressure': readings.get('pressure', 0),
-                            'light': readings.get('light', 0),
-                            'rain': readings.get('rain', 0)
+                            'temperature': readings.get('temperature', 0) if readings.get('temperature') is not None else 0,
+                            'humidity': readings.get('humidity', 0) if readings.get('humidity') is not None else 0,
+                            'soil_moisture': readings.get('soil_moisture', 0) if readings.get('soil_moisture') is not None else 0,
+                            'pressure': readings.get('pressure', 0) if readings.get('pressure') is not None else 0,
+                            'light': readings.get('light', 0) if readings.get('light') is not None else 0,
+                            'rain': readings.get('rain', 0) if readings.get('rain') is not None else 0
                         }
                         
                         # Log what we're updating
