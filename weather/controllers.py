@@ -150,10 +150,14 @@ def get_pressure_display():
     """Get formatted pressure display data."""
     readings = sensor_controller.get_latest_readings()
     pressure = readings.get('pressure')
-    if pressure is None or pressure == 0:
+    if pressure is None:
         return ("Pressure:", "Not available")
-    else:
-        return (f"Pressure:", f"{pressure:.1f} hPa")
+    try:
+        # Try to format as float, but handle any conversion errors
+        return (f"Pressure:", f"{float(pressure):.1f} hPa")
+    except (ValueError, TypeError):
+        # If conversion fails, just display the raw value
+        return (f"Pressure:", f"{pressure} hPa")
 
 def get_light_display():
     """Get formatted light display data."""
@@ -161,8 +165,12 @@ def get_light_display():
     light = readings.get('light')
     if light is None:
         return ("Light Level:", "Not available")
-    else:
-        return (f"Light Level:", f"{light:.1f}%")
+    try:
+        # Try to format as float, but handle any conversion errors
+        return (f"Light Level:", f"{float(light):.1f}%")
+    except (ValueError, TypeError):
+        # If conversion fails, just display the raw value
+        return (f"Light Level:", f"{light}%")
 
 def get_rain_display():
     """Get formatted rain display data."""
@@ -170,8 +178,12 @@ def get_rain_display():
     rain = readings.get('rain')
     if rain is None:
         return ("Rain Level:", "Not available")
-    else:
-        return (f"Rain Level:", f"{rain:.1f}%")
+    try:
+        # Try to format as float, but handle any conversion errors
+        return (f"Rain Level:", f"{float(rain):.1f}%")
+    except (ValueError, TypeError):
+        # If conversion fails, just display the raw value
+        return (f"Rain Level:", f"{rain}%")
 
 def get_latest_weather_data():
     """Get the latest weather data."""
@@ -232,3 +244,15 @@ def get_network_ssid():
     except Exception as e:
         logger.error(f"Error getting network SSID: {e}")
         return "Unknown"
+
+
+def display_shutdown():
+    """Display shutdown message on the LCD."""
+    global lcd
+    if lcd:
+        try:
+            lcd.clear()
+            lcd.write_line(0, "System")
+            lcd.write_line(1, "Shutting Down...")
+        except Exception as e:
+            logger.error(f"Error displaying shutdown message: {e}")
