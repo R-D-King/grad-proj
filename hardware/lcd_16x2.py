@@ -304,8 +304,14 @@ def main():
 if __name__ == "__main__":
     main()
 
+# Add this method to the LCD class
+
 def display_shutdown(self):
-    """Display shutdown message on LCD."""
-    self.clear()
-    self.write_line(0, "System Shutdown")
+    """Display shutdown message on the LCD."""
+    try:
+        self.clear()
+        self.write_string("System Shutdown", 0, 0)
+        self.write_string("Please wait...", 1, 0)
+    except Exception as e:
+        print(f"Error displaying shutdown message: {e}")
     self.write_line(1, "Goodbye!")

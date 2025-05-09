@@ -11,41 +11,181 @@ from flask import current_app
 # Set up logging
 logger = logging.getLogger(__name__)
 
+"""
+Unified sensor controller for managing all sensors in the system.
+"""
+import time
+import random
+from datetime import datetime
+
 class SensorController:
-    """Controller for managing all sensors and providing unified interface."""
+    """Controller for managing all sensors in the system."""
     
-    def __init__(self, simulation=False, ui_update_interval=1, db_update_interval=60):
+    def __init__(self, simulation=False):
         """Initialize the sensor controller.
         
         Args:
-            simulation: Whether to simulate sensor readings
-            ui_update_interval: Time between UI updates in seconds
-            db_update_interval: Time between database updates in seconds
+            simulation (bool): Whether to use simulated sensors
         """
         self.simulation = simulation
-        self.ui_update_interval = ui_update_interval
-        self.db_update_interval = db_update_interval
-        self.dht_sensor = None
-        self.soil_moisture_sensor = None
-        self.water_level_sensor = None
-        self.last_readings = {
-            'temperature': 0,
-            'humidity': 0,
-            'soil_moisture': 0,
-            'water_level': 0,
+        self.sensors = {}
+        self.last_readings = {}
+        
+        # Initialize sensors based on simulation mode
+        self._initialize_sensors()
+    
+    def _initialize_sensors(self):
+        """Initialize all sensors based on simulation mode."""
+        try:
+            if self.simulation:
+                from .sensor_simulation import SimulatedSensor
+                self.sensors['dht'] = SimulatedSensor('dht', min_value=0, max_value=40, default_value=22)
+                self.sensors['soil_moisture'] = SimulatedSensor('soil_moisture', min_value=0, max_value=100, default_value=50)
+                self.sensors['water_level'] = SimulatedSensor('water_level', min_value=0, max_value=100, default_value=75)
+                self.sensors['pressure'] = SimulatedSensor('pressure', min_value=980, max_value=1050, default_value=1013)
+                self.sensors['light'] = SimulatedSensor('light', min_value=0, max_value=100, default_value=60)
+                self.sensors['rain'] = SimulatedSensor('rain', min_value=0, max_value=100, default_value=10)
+            else:
+                # Initialize hardware sensors
+                try:
+                    from .dht22 import DHT22Sensor
+                    self.sensors['dht'] = DHT22Sensor(pin=4)
+                except Exception as e:
+                    print(f"Error initializing DHT22 sensor: {e}")
+                    self.sensors['dht'] = None
+                
+                try:
+                    from .soil_moisture import SoilMoistureSensor
+                    self.sensors['soil_moisture'] = SoilMoistureSensor()
+                except Exception as e:
+                    print(f"Error initializing soil moisture sensor: {e}")
+                    self.sensors['soil_moisture'] = None
+                
+                try:
+                    from .water_level import WaterLevelSensor
+                    self.sensors['water_level'] = WaterLevelSensor(pin=17)
+                except Exception as e:
+                    print(f"Error initializing water level sensor: {e}")
+                    self.sensors['water_level'] = None
+                
+                try:
+                    from .bmp180 import BMP180Sensor
+                    self.sensors['pressure'] = BMP180Sensor()
+                except Exception as e:
+                    print(f"Error initializing BMP180 sensor: {e}")
+                    self.sensors['pressure'] = None
+                
+                try:
+                    from .ldr_aout import LDRSensor
+                    self.sensors['light'] = LDRSensor()
+                except Exception as e:
+                    print(f"Error initializing LDR sensor: {e}")
+                    self.sensors['light'] = None
+                
+                try:
+                    from .rain_aout import RainSensor
+                    self.sensors['rain'] = RainSensor()
+                except Exception as e:
+                    print(f"Error initializing rain sensor: {e}")
+                    self.sensors['rain'] = None
+        except Exception as e:
+            print(f"Error initializing sensors: {e}")
+    
+    def _read_dht(self):
+        """Read temperature and humidity from DHT sensor."""
+        if 'dht' not in self.sensors or self.sensors['dht'] is None:
+            if self.simulation:
+                return {'temperature': random.uniform(18, 30), 'humidity': random.uniform(30, 80)}
+            return {'temperature': None, 'humidity': None}
+        
+        try:
+            return self.sensors['dht'].read()
+        except Exception as e:
+            print(f"Error reading DHT sensor: {e}")
+            return {'temperature': None, 'humidity': None}
+    
+    def _read_soil_moisture(self):
+        """Read soil moisture level."""
+        if 'soil_moisture' not in self.sensors or self.sensors['soil_moisture'] is None:
+            if self.simulation:
+                return random.uniform(0, 100)
+            return None
+        
+        try:
+            return self.sensors['soil_moisture'].read()
+        except Exception as e:
+            print(f"Error reading soil moisture sensor: {e}")
+            return None
+    
+    def _read_water_level(self):
+        """Read water level."""
+        if 'water_level' not in self.sensors or self.sensors['water_level'] is None:
+            if self.simulation:
+                return random.uniform(0, 100)
+            return None
+        
+        try:
+            return self.sensors['water_level'].read()
+        except Exception as e:
+            print(f"Error reading water level sensor: {e}")
+            return None
+    
+    def _read_pressure(self):
+        """Read barometric pressure."""
+        if 'pressure' not in self.sensors or self.sensors['pressure'] is None:
+            if self.simulation:
+                return random.uniform(980, 1050)
+            return None
+        
+        try:
+            return self.sensors['pressure'].read()
+        except Exception as e:
+            print(f"Error reading pressure sensor: {e}")
+            return None
+    
+    def _read_light(self):
+        """Read light level."""
+        if 'light' not in self.sensors or self.sensors['light'] is None:
+            if self.simulation:
+                return random.uniform(0, 100)
+            return None
+        
+        try:
+            return self.sensors['light'].read()
+        except Exception as e:
+            print(f"Error reading light sensor: {e}")
+            return None
+    
+    def _read_rain(self):
+        """Read rain level."""
+        if 'rain' not in self.sensors or self.sensors['rain'] is None:
+            if self.simulation:
+                return random.uniform(0, 100)
+            return None
+        
+        try:
+            return self.sensors['rain'].read()
+        except Exception as e:
+            print(f"Error reading rain sensor: {e}")
+            return None
+    
+    def read_all(self):
+        """Read all sensor values and return as a dictionary."""
+        dht_data = self._read_dht()
+        
+        readings = {
+            'temperature': dht_data.get('temperature'),
+            'humidity': dht_data.get('humidity'),
+            'soil_moisture': self._read_soil_moisture(),
+            'water_level': self._read_water_level(),
+            'pressure': self._read_pressure(),
+            'light': self._read_light(),
+            'rain': self._read_rain(),
             'timestamp': datetime.now().isoformat()
         }
-        self.running = False
-        self.ui_thread = None
-        self.db_thread = None
-        self.last_db_update = 0  # Timestamp of last database update
-        self.socketio = None  # Will be set later
-        self.app = None  # Store the Flask app instance
         
-        # Initialize sensors based on platform
-        self._initialize_sensors()
-        
-        logger.info(f"Sensor controller initialized (simulation={simulation}, ui_interval={ui_update_interval}s, db_interval={db_update_interval}s)")
+        self.last_readings = readings
+        return readings
     
     def set_socketio(self, socketio_instance):
         """Set the SocketIO instance to use for real-time updates."""
