@@ -2,9 +2,16 @@ from datetime import datetime
 from shared.database import db
 from shared.socketio import socketio
 from .models import WeatherData
+import time
+import threading
+import logging
 
 # Import the sensor controller
 from hardware.sensor_controller import SensorController
+from hardware.lcd_16x2 import LCD
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 # Initialize the sensor controller with simulation mode based on environment
 # This will be set to False on Raspberry Pi
@@ -22,8 +29,15 @@ sensor_controller = SensorController(
     db_update_interval=DB_UPDATE_INTERVAL
 )
 
+# LCD display instance - will be initialized in init_app
+lcd = None
+lcd_thread = None
+lcd_running = False
+
 def init_app(app):
     """Initialize the weather controller with the app context."""
+    global lcd, lcd_thread, lcd_running
+    
     # Set the socketio instance for the sensor controller
     sensor_controller.set_socketio(socketio)
     
@@ -32,6 +46,92 @@ def init_app(app):
     
     # Start sensor monitoring with configured intervals
     sensor_controller.start_monitoring()
+    
+    # Initialize LCD display with configuration from app
+    try:
+        # Get LCD configuration from app config
+        config = app.config.get_namespace('')
+        lcd_config = config.get('hardware', {}).get('sensors', {}).get('pins', {}).get('lcd', {})
+        
+        # Extract LCD parameters with defaults as fallback
+        cols = lcd_config.get('cols', 16)
+        rows = lcd_config.get('rows', 2)
+        pin_rs = lcd_config.get('pin_rs', 25)
+        pin_e = lcd_config.get('pin_e', 24)
+        pins_data = lcd_config.get('pins_data', [23, 17, 18, 22])
+        simulation = simulation_mode
+        
+        # Initialize LCD
+        lcd = LCD(
+            cols=cols, 
+            rows=rows, 
+            pin_rs=pin_rs, 
+            pin_e=pin_e, 
+            pins_data=pins_data, 
+            simulation=simulation
+        )
+        
+        # Display IP and port on LCD
+        ip_address = app.config.get('IP_ADDRESS', '127.0.0.1')
+        port = app.config.get('PORT', 5000)
+        
+        lcd.clear()
+        lcd.write_line(0, f"IP:{ip_address}")
+        lcd.write_line(1, f"Port:{port}")
+        
+        # Start LCD update thread
+        lcd_running = True
+        lcd_thread = threading.Thread(target=lcd_update_loop, args=(app,))
+        lcd_thread.daemon = True
+        lcd_thread.start()
+        
+        logger.info("LCD display initialized and update thread started")
+    except Exception as e:
+        logger.error(f"Failed to initialize LCD display: {e}")
+        lcd = None
+
+def lcd_update_loop(app):
+    """Background thread for updating LCD display."""
+    global lcd_running
+    
+    # Wait 5 seconds to keep showing IP and port
+    time.sleep(5)
+    
+    # Define display modes and their data
+    display_modes = [
+        # Mode 0: IP and Port
+        lambda: (f"IP:{app.config.get('IP_ADDRESS', '127.0.0.1')[:16]}", 
+                f"Port:{app.config.get('PORT', 5000)}"),
+        
+        # Mode 1: Temperature and Humidity
+        lambda: (f"Temp: {sensor_controller.get_latest_readings().get('temperature', 0):.1f}C", 
+                f"Humid: {sensor_controller.get_latest_readings().get('humidity', 0):.1f}%"),
+        
+        # Mode 2: Soil Moisture and Water Level
+        lambda: (f"Soil: {sensor_controller.get_latest_readings().get('soil_moisture', 0):.1f}%", 
+                f"Water: {sensor_controller.get_latest_readings().get('water_level', 0):.1f}%")
+    ]
+    
+    current_mode = 0
+    
+    while lcd_running and lcd:
+        try:
+            # Get data for current display mode
+            line1, line2 = display_modes[current_mode]()
+            
+            # Update LCD
+            lcd.clear()
+            lcd.write_line(0, line1)
+            lcd.write_line(1, line2)
+            
+            # Cycle to next mode
+            current_mode = (current_mode + 1) % len(display_modes)
+            
+            # Wait before changing display
+            time.sleep(3)
+        except Exception as e:
+            logger.error(f"Error updating LCD: {e}")
+            time.sleep(1)
 
 def get_latest_weather_data():
     """Get the latest weather data."""

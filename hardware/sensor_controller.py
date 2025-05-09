@@ -59,6 +59,15 @@ class SensorController:
     
     def _initialize_sensors(self):
         """Initialize the appropriate sensors based on platform."""
+        # Get pin configuration from config
+        try:
+            from flask import current_app
+            config = current_app.config.get_namespace('')
+            dht_pin = config.get('hardware', {}).get('sensors', {}).get('pins', {}).get('dht22', 26)
+        except Exception as e:
+            logger.warning(f"Could not get DHT pin from config, using default: {e}")
+            dht_pin = 26  # Default pin if config not available
+            
         if self.simulation or platform.system() != "Linux":
             logger.info("Using simulated sensors")
             from hardware.water_level import WaterLevelSensor
@@ -78,11 +87,24 @@ class SensorController:
             logger.info("Water level sensor not available - using simulated data")
             
             try:
-                # Initialize DHT22 sensor
+                # Initialize DHT22 sensor with pin from config
                 import adafruit_dht
                 import board
-                self.dht_sensor = adafruit_dht.DHT22(board.D4)  # Using GPIO pin 4
-                logger.info("DHT22 sensor initialized")
+                pin_map = {
+                    4: board.D4,
+                    17: board.D17,
+                    18: board.D18,
+                    21: board.D21,
+                    22: board.D22,
+                    23: board.D23,
+                    24: board.D24,
+                    25: board.D25,
+                    26: board.D26,
+                    # Add more pins as needed
+                }
+                pin = pin_map.get(dht_pin, board.D26)  # Default to D26 if pin not in map
+                self.dht_sensor = adafruit_dht.DHT22(pin)
+                logger.info(f"DHT22 sensor initialized on pin {dht_pin}")
             except (ImportError, NotImplementedError) as e:
                 logger.error(f"Failed to initialize DHT22 sensor: {e}")
                 from hardware.sensor_simulation import SimulatedDHT

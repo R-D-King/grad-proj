@@ -30,6 +30,46 @@ class Config:
         "server": "server.json"
     }
     
+    # Default hardware configuration
+    DEFAULT_HARDWARE_CONFIG = {
+        "sensors": {
+            "ui_update_interval": 1,
+            "db_update_interval": 60,
+            "simulation": False,
+            "pins": {
+                "dht22": 26,
+                "soil_moisture": {
+                    "channel": 0,
+                    "dry_value": 1023,
+                    "wet_value": 300
+                },
+                "water_level": 17,
+                "relay": 21,
+                "bmp180": {
+                    "i2c_address": "0x77",
+                    "i2c_bus": 1
+                },
+                "lcd": {
+                    "cols": 16,
+                    "rows": 2,
+                    "pin_rs": 25,
+                    "pin_e": 24,
+                    "pins_data": [23, 17, 18, 22]
+                },
+                "ldr": {
+                    "channel": 1,
+                    "min_value": 0,
+                    "max_value": 1023
+                },
+                "rain": {
+                    "channel": 2,
+                    "dry_value": 1023,
+                    "wet_value": 300
+                }
+            }
+        }
+    }
+    
     # Environment variable mappings to configuration keys
     ENV_MAPPINGS = {
         "UI_UPDATE_INTERVAL": "hardware.sensors.ui_update_interval",
@@ -78,10 +118,20 @@ class Config:
                     logger.debug(f"Loaded configuration from {file_path}")
                 else:
                     logger.warning(f"Configuration file {file_path} not found")
-                    self.config[section] = {}
+                    # Use default configuration for hardware if file not found
+                    if section == "hardware":
+                        self.config[section] = self.DEFAULT_HARDWARE_CONFIG
+                        logger.info("Using default hardware configuration")
+                    else:
+                        self.config[section] = {}
             except Exception as e:
                 logger.error(f"Error loading configuration file {file_path}: {e}")
-                self.config[section] = {}
+                # Use default configuration for hardware if error loading file
+                if section == "hardware":
+                    self.config[section] = self.DEFAULT_HARDWARE_CONFIG
+                    logger.info("Using default hardware configuration due to error")
+                else:
+                    self.config[section] = {}
     
     def _load_from_env(self) -> None:
         """Override configuration with environment variables."""

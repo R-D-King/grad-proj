@@ -14,8 +14,6 @@ from shared.routes import shared_bp
 from irrigation.routes import irrigation_bp
 from weather.routes import weather_bp
 from reports.routes import reports_bp
-app.register_blueprint(reports_bp)
-
 # Set default configuration values for key operational parameters
 os.environ.setdefault('UI_UPDATE_INTERVAL', '1')  # 1 second default
 os.environ.setdefault('DB_UPDATE_INTERVAL', '60')  # 60 seconds default
@@ -86,6 +84,9 @@ if __name__ == '__main__':
     
     # Get the device's IP address
     ip_address = get_ip_address()
+    
+    # Store IP address in app config for LCD display
+    app.config['IP_ADDRESS'] = ip_address
     
     # Run the application
     host = config.get('HOST', '0.0.0.0')
