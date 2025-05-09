@@ -30,6 +30,13 @@ class SensorController:
         self.simulation = simulation
         self.sensors = {}
         self.last_readings = {}
+        self.running = False  # Initialize the running attribute
+        self.socketio = None  # Initialize socketio
+        self.app = None       # Initialize app
+        self.ui_update_interval = 1  # Default value
+        self.db_update_interval = 60  # Default value
+        self.last_ui_update = 0
+        self.last_db_update = 0
         
         # Initialize sensors based on simulation mode
         self._initialize_sensors()
