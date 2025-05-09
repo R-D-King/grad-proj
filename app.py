@@ -74,6 +74,25 @@ def create_app(config_class=Config):
         from datetime import datetime
         return {"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
     
+    def signal_handler(sig, frame):
+        """Handle SIGINT (Ctrl+C) gracefully."""
+        print("\nreceived SIGINT")
+        
+        # Display shutdown message on LCD if available
+        try:
+            from weather.controllers import lcd
+            if lcd:
+                lcd.display_shutdown()
+                time.sleep(1)  # Give time for the message to be displayed
+        except Exception as e:
+            print(f"Error displaying shutdown message: {e}")
+        
+        # Exit the application
+        sys.exit(0)
+    
+    # Register signal handler
+    signal.signal(signal.SIGINT, signal_handler)
+    
     return app
 
 if __name__ == '__main__':

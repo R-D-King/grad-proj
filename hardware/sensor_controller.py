@@ -338,5 +338,128 @@ class SensorController:
         return readings
     
     def get_latest_readings(self):
-        """Get the most recent sensor readings."""
-        return self.last_readings
+        """Get the latest sensor readings."""
+        readings = {
+            'temperature': 0,
+            'humidity': 0,
+            'soil_moisture': 0,
+            'water_level': 0,
+            'pressure': 0,
+            'light_percentage': 0
+        }
+        
+        # Get temperature and humidity from DHT22
+        try:
+            temperature, humidity = self._read_dht()
+            readings['temperature'] = temperature
+            readings['humidity'] = humidity
+        except Exception as e:
+            logger.error(f"Error reading DHT sensor: {e}")
+        
+        # Get soil moisture
+        try:
+            soil_moisture = self._read_soil_moisture()
+            readings['soil_moisture'] = soil_moisture
+        except Exception as e:
+            logger.error(f"Error reading soil moisture sensor: {e}")
+        
+        # Get water level
+        try:
+            water_level = self._read_water_level()
+            readings['water_level'] = water_level
+        except Exception as e:
+            logger.error(f"Error reading water level sensor: {e}")
+        
+        # Get pressure from BMP180
+        try:
+            pressure = self._read_pressure()
+            readings['pressure'] = pressure
+        except Exception as e:
+            logger.error(f"Error reading BMP180 sensor: {e}")
+        
+        # Get light percentage from LDR
+        try:
+            light_percentage = self._read_light_percentage()
+            readings['light_percentage'] = light_percentage
+        except Exception as e:
+            logger.error(f"Error reading LDR sensor: {e}")
+        
+        return readings
+    
+    def _read_pressure(self):
+        """Read pressure from BMP180 sensor."""
+        if hasattr(self, 'bmp180_sensor'):
+            try:
+                # If we already have a BMP180 sensor instance, use it
+                _, pressure, _ = self.bmp180_sensor.read()
+                return pressure
+            except Exception as e:
+                logger.error(f"Error reading from existing BMP180 sensor: {e}")
+        
+        # If we don't have a BMP180 sensor instance or there was an error, try to create one
+        try:
+            from hardware.bmp180 import BMP180Sensor
+            
+            # Get configuration if available
+            bmp_config = {}
+            if hasattr(self, 'app'):
+                with self.app.app_context():
+                    bmp_config = self.app.config.get('hardware', {}).get('sensors', {}).get('pins', {}).get('bmp180', {})
+            
+            # Extract parameters with defaults
+            i2c_address = bmp_config.get('i2c_address', 0x77)
+            if isinstance(i2c_address, str) and i2c_address.startswith('0x'):
+                i2c_address = int(i2c_address, 16)
+            i2c_bus = bmp_config.get('i2c_bus', 1)
+            
+            # Create BMP180 sensor instance
+            self.bmp180_sensor = BMP180Sensor(
+                i2c_address=i2c_address,
+                i2c_bus=i2c_bus,
+                simulation=self.simulation
+            )
+            
+            # Read from the sensor
+            _, pressure, _ = self.bmp180_sensor.read()
+            return pressure
+        except Exception as e:
+            logger.error(f"Error initializing BMP180 sensor: {e}")
+            return 0
+    
+    def _read_light_percentage(self):
+        """Read light percentage from LDR sensor."""
+        if hasattr(self, 'ldr_sensor'):
+            try:
+                # If we already have an LDR sensor instance, use it
+                return self.ldr_sensor.get_light_percentage()
+            except Exception as e:
+                logger.error(f"Error reading from existing LDR sensor: {e}")
+        
+        # If we don't have an LDR sensor instance or there was an error, try to create one
+        try:
+            from hardware.ldr_aout import LDRSensor
+            
+            # Get configuration if available
+            ldr_config = {}
+            if hasattr(self, 'app'):
+                with self.app.app_context():
+                    ldr_config = self.app.config.get('hardware', {}).get('sensors', {}).get('pins', {}).get('ldr', {})
+            
+            # Extract parameters with defaults
+            channel = ldr_config.get('channel', 1)
+            min_value = ldr_config.get('min_value', 0)
+            max_value = ldr_config.get('max_value', 1023)
+            
+            # Create LDR sensor instance
+            self.ldr_sensor = LDRSensor(
+                channel=channel,
+                min_value=min_value,
+                max_value=max_value,
+                simulation=self.simulation
+            )
+            
+            # Read from the sensor
+            return self.ldr_sensor.get_light_percentage()
+        except Exception as e:
+            logger.error(f"Error initializing LDR sensor: {e}")
+            return 0

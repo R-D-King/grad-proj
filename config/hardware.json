@@ -11,7 +11,9 @@
         "wet_value": 300
       },
       "water_level": 17,
-      "relay": 21,
+      "relay": {
+        "pin": 21
+      },
       "bmp180": {
         "i2c_address": "0x77",
         "i2c_bus": 1

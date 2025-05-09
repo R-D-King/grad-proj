@@ -303,3 +303,9 @@ def main():
 # Run the main function if this script is executed directly
 if __name__ == "__main__":
     main()
+
+def display_shutdown(self):
+    """Display shutdown message on LCD."""
+    self.clear()
+    self.write_line(0, "System Shutdown")
+    self.write_line(1, "Goodbye!")
