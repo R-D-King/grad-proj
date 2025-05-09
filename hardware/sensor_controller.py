@@ -441,14 +441,16 @@ class SensorController:
         try:
             if hasattr(self.dht_sensor, 'temperature') and hasattr(self.dht_sensor, 'humidity'):
                 # Adafruit DHT sensor
-                readings['temperature'] = self.dht_sensor.temperature
-                readings['humidity'] = self.dht_sensor.humidity
+                temp = self.dht_sensor.temperature
+                humid = self.dht_sensor.humidity
+                readings['temperature'] = float(temp) if temp is not None else None
+                readings['humidity'] = float(humid) if humid is not None else None
             elif hasattr(self.dht_sensor, 'read'):
                 # Simulated sensor
                 dht_data = self.dht_sensor.read()
-                readings['temperature'] = dht_data['temperature']
-                readings['humidity'] = dht_data['humidity']
-            logger.debug(f"DHT readings: {readings['temperature']}°C, {readings['humidity']}%")
+                readings['temperature'] = float(dht_data['temperature']) if dht_data['temperature'] is not None else None
+                readings['humidity'] = float(dht_data['humidity']) if dht_data['humidity'] is not None else None
+            logger.debug(f"DHT readings: {readings.get('temperature')}°C, {readings.get('humidity')}%")
         except Exception as e:
             logger.error(f"Error reading DHT sensor: {e}")
             # Provide realistic default values and mark as simulated
@@ -494,6 +496,10 @@ class SensorController:
     
     def get_latest_readings(self):
         """Get the latest sensor readings."""
+        # If we don't have any readings yet, update them
+        if not self.last_readings:
+            return self.update_readings()
+        return self.last_readings
         readings = {
             'temperature': 0,
             'humidity': 0,
