@@ -394,23 +394,31 @@ class SensorController:
                             
                             # Only insert into database if we have valid temperature and humidity
                             if temperature is not None and humidity is not None:
-                                # Create new weather data entry
-                                weather_data = WeatherData(
-                                    temperature=temperature,
-                                    humidity=humidity,
-                                    soil_moisture=soil_moisture,
-                                    pressure=0     # We don't have a pressure sensor
-                                )
-                                db.session.add(weather_data)
-                                db.session.commit()
-                                
-                                # Emit via socketio if available
-                                if self.socketio:
-                                    self.socketio.emit('weather_update', weather_data.to_dict())
-                                
-                                # Update the timestamp
-                                self.last_db_update = current_time
-                                logger.debug("Updated database with sensor readings")
+                                # Make sure values are numeric
+                                try:
+                                    temp_value = float(temperature)
+                                    humidity_value = float(humidity)
+                                    soil_value = float(soil_moisture) if soil_moisture is not None else 0.0
+                                    
+                                    # Create new weather data entry
+                                    weather_data = WeatherData(
+                                        temperature=temp_value,
+                                        humidity=humidity_value,
+                                        soil_moisture=soil_value,
+                                        pressure=0.0  # We don't have a pressure sensor
+                                    )
+                                    db.session.add(weather_data)
+                                    db.session.commit()
+                                    
+                                    # Emit via socketio if available
+                                    if self.socketio:
+                                        self.socketio.emit('weather_update', weather_data.to_dict())
+                                    
+                                    # Update the timestamp
+                                    self.last_db_update = current_time
+                                    logger.debug("Updated database with sensor readings")
+                                except (ValueError, TypeError) as e:
+                                    logger.error(f"Invalid sensor values: {e}, temperature={temperature}, humidity={humidity}")
                             else:
                                 logger.warning("Skipping database update due to missing temperature or humidity data")
                         
