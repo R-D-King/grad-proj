@@ -12,28 +12,66 @@ logger = logging.getLogger(__name__)
 class BMP180Sensor:
     """BMP180 pressure and temperature sensor interface."""
     
-    def __init__(self, i2c_address=0x77, i2c_bus=1, simulation=False):
+    def __init__(self, i2c_address=0x77, i2c_bus=1, simulation=False, max_retries=3, timeout=1.0):
         """Initialize the BMP180 sensor.
         
         Args:
             i2c_address: I2C address of the sensor (default: 0x77)
             i2c_bus: I2C bus to use (default: 1 for Raspberry Pi)
             simulation: Whether to simulate readings
+            max_retries: Maximum number of retries for I2C operations
+            timeout: Timeout in seconds for I2C operations
         """
         self.i2c_address = i2c_address
         self.i2c_bus = i2c_bus
         self.simulation = simulation
         self.bus = None
+        self.max_retries = max_retries
+        self.timeout = timeout
         
         if not simulation:
             try:
                 self.bus = smbus.SMBus(i2c_bus)
-                # Test if sensor is reachable
-                self.read_id()
-            except (ImportError, IOError, OSError) as e:
+                # Test if sensor is reachable with timeout
+                self._with_timeout(self.read_id)
+            except (ImportError, IOError, OSError, TimeoutError) as e:
                 logger.error(f"Error initializing BMP180: {e}")
                 self.simulation = True
                 logger.info("Using simulation mode for BMP180 sensor")
+    
+    def _with_timeout(self, func, *args, **kwargs):
+        """Execute a function with a timeout."""
+        # Define a timeout handler
+        def timeout_handler(signum, frame):
+            raise TimeoutError(f"Operation timed out after {self.timeout} seconds")
+        
+        # Set up the timeout
+        old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+        signal.setitimer(signal.ITIMER_REAL, self.timeout)
+        
+        try:
+            # Execute the function
+            result = func(*args, **kwargs)
+            return result
+        finally:
+            # Reset the timeout
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            signal.signal(signal.SIGALRM, old_handler)
+    
+    def _with_retry(self, func, *args, **kwargs):
+        """Execute a function with retries."""
+        last_exception = None
+        for attempt in range(self.max_retries):
+            try:
+                return self._with_timeout(func, *args, **kwargs)
+            except (IOError, OSError, TimeoutError) as e:
+                last_exception = e
+                logger.warning(f"Retry {attempt+1}/{self.max_retries} failed: {e}")
+                time.sleep(0.1)  # Short delay between retries
+        
+        # If we get here, all retries failed
+        logger.error(f"All {self.max_retries} retries failed: {last_exception}")
+        raise last_exception
     
     def get_short(self, data, index):
         """Combine two bytes and return signed 16-bit value."""
@@ -77,8 +115,12 @@ class BMP180Sensor:
         OVERSAMPLE = 3  # Oversampling setting (0-3)
 
         try:
-            # Read calibration data from the sensor
-            cal = self.bus.read_i2c_block_data(self.i2c_address, REG_CALIB, 22)
+            # Use retry mechanism for all I2C operations
+            def read_calibration():
+                return self.bus.read_i2c_block_data(self.i2c_address, REG_CALIB, 22)
+            
+            # Read calibration data with retry
+            cal = self._with_retry(read_calibration)
 
             # Convert bytes to calibration values
             AC1 = self.get_short(cal, 0)
@@ -93,16 +135,34 @@ class BMP180Sensor:
             MC  = self.get_short(cal, 18)
             MD  = self.get_short(cal, 20)
 
-            # Request temperature measurement
-            self.bus.write_byte_data(self.i2c_address, REG_MEAS, CRV_TEMP)
-            time.sleep(0.005)  # Wait for measurement
-            msb, lsb = self.bus.read_i2c_block_data(self.i2c_address, REG_MSB, 2)
+            # Request temperature measurement with retry
+            def request_temp():
+                self.bus.write_byte_data(self.i2c_address, REG_MEAS, CRV_TEMP)
+                time.sleep(0.005)  # Wait for measurement
+            
+            self._with_retry(request_temp)
+            
+            # Read temperature with retry
+            def read_temp():
+                return self.bus.read_i2c_block_data(self.i2c_address, REG_MSB, 2)
+            
+            temp_data = self._with_retry(read_temp)
+            msb, lsb = temp_data
             UT = (msb << 8) + lsb
 
-            # Request pressure measurement
-            self.bus.write_byte_data(self.i2c_address, REG_MEAS, CRV_PRES + (OVERSAMPLE << 6))
-            time.sleep(0.04)  # Wait for measurement
-            msb, lsb, xsb = self.bus.read_i2c_block_data(self.i2c_address, REG_MSB, 3)
+            # Request pressure measurement with retry
+            def request_pressure():
+                self.bus.write_byte_data(self.i2c_address, REG_MEAS, CRV_PRES + (OVERSAMPLE << 6))
+                time.sleep(0.04)  # Wait for measurement
+            
+            self._with_retry(request_pressure)
+            
+            # Read pressure with retry
+            def read_pressure():
+                return self.bus.read_i2c_block_data(self.i2c_address, REG_MSB, 3)
+            
+            pressure_data = self._with_retry(read_pressure)
+            msb, lsb, xsb = pressure_data
             UP = ((msb << 16) + (lsb << 8) + xsb) >> (8 - OVERSAMPLE)
 
             # Calculate true temperature

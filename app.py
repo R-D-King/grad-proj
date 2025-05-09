@@ -79,7 +79,7 @@ def create_app(config_class=Config):
     
     def signal_handler(sig, frame):
         """Handle SIGINT (Ctrl+C) gracefully."""
-        print("\nreceived SIGINT")
+        print("\nReceived SIGINT")
         
         # Display shutdown message on LCD if available
         try:
@@ -93,7 +93,20 @@ def create_app(config_class=Config):
         # Clean up any GPIO resources
         try:
             print("\nDe-initializing hardware resources...")
-            # Add any additional cleanup here
+            # Clean up GPIO resources
+            import RPi.GPIO as GPIO
+            GPIO.cleanup()
+            
+            # Close any open I2C bus connections
+            from hardware.sensor_controller import sensor_controller
+            if hasattr(sensor_controller, 'sensors'):
+                for sensor_name, sensor in sensor_controller.sensors.items():
+                    if hasattr(sensor, 'bus') and sensor.bus is not None:
+                        try:
+                            sensor.bus.close()
+                            print(f"Closed I2C bus for {sensor_name} sensor")
+                        except Exception as e:
+                            print(f"Error closing I2C bus for {sensor_name} sensor: {e}")
         except Exception as e:
             print(f"Error during cleanup: {e}")
         
