@@ -101,7 +101,7 @@ def create_app(config_class=Config):
         try:
             from weather.controllers import display_shutdown
             display_shutdown()
-            time.sleep(1)  # Give time for the message to be displayed
+            time.sleep(2)  # Give more time for the message to be displayed
         except Exception as e:
             print(f"Error displaying shutdown message: {e}")
         

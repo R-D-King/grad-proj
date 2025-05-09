@@ -113,16 +113,8 @@ def lcd_update_loop(app):
         
         # Mode 3: Soil Moisture
         lambda: (f"Soil Moisture:", 
-                f"{sensor_controller.get_latest_readings().get('soil_moisture', 0):.1f}%"),
+                f"{sensor_controller.get_latest_readings().get('soil_moisture', 0):.1f}%")
         
-        # Mode 4: Pressure from BMP180 - Reimplemented
-        lambda: get_pressure_display(),
-        
-        # Mode 5: Light Percentage from LDR - Reimplemented
-        lambda: get_light_display(),
-                
-        # Mode 6: Rain Percentage - Reimplemented
-        lambda: get_rain_display()
     ]
     
     current_mode = 0
@@ -244,15 +236,3 @@ def get_network_ssid():
     except Exception as e:
         logger.error(f"Error getting network SSID: {e}")
         return "Unknown"
-
-
-def display_shutdown():
-    """Display shutdown message on the LCD."""
-    global lcd
-    if lcd:
-        try:
-            lcd.clear()
-            lcd.write_line(0, "System")
-            lcd.write_line(1, "Shutting Down...")
-        except Exception as e:
-            logger.error(f"Error displaying shutdown message: {e}")
