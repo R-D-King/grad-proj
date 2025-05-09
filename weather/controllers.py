@@ -115,17 +115,14 @@ def lcd_update_loop(app):
         lambda: (f"Soil Moisture:", 
                 f"{sensor_controller.get_latest_readings().get('soil_moisture', 0):.1f}%"),
         
-        # Mode 4: Pressure from BMP180
-        lambda: (f"Pressure:", 
-                f"{sensor_controller.get_latest_readings().get('pressure', 0):.1f} hPa"),
+        # Mode 4: Pressure from BMP180 - Reimplemented
+        lambda: get_pressure_display(),
         
-        # Mode 5: Light Percentage from LDR
-        lambda: (f"Light Level:", 
-                f"{sensor_controller.get_latest_readings().get('light', 0):.1f}%"),
+        # Mode 5: Light Percentage from LDR - Reimplemented
+        lambda: get_light_display(),
                 
-        # Mode 6: Rain Percentage
-        lambda: (f"Rain Level:", 
-                f"{sensor_controller.get_latest_readings().get('rain', 0):.1f}%")
+        # Mode 6: Rain Percentage - Reimplemented
+        lambda: get_rain_display()
     ]
     
     current_mode = 0
@@ -148,6 +145,33 @@ def lcd_update_loop(app):
         except Exception as e:
             logger.error(f"Error updating LCD: {e}")
             time.sleep(1)
+
+def get_pressure_display():
+    """Get formatted pressure display data."""
+    readings = sensor_controller.get_latest_readings()
+    pressure = readings.get('pressure')
+    if pressure is None or pressure == 0:
+        return ("Pressure:", "Not available")
+    else:
+        return (f"Pressure:", f"{pressure:.1f} hPa")
+
+def get_light_display():
+    """Get formatted light display data."""
+    readings = sensor_controller.get_latest_readings()
+    light = readings.get('light')
+    if light is None:
+        return ("Light Level:", "Not available")
+    else:
+        return (f"Light Level:", f"{light:.1f}%")
+
+def get_rain_display():
+    """Get formatted rain display data."""
+    readings = sensor_controller.get_latest_readings()
+    rain = readings.get('rain')
+    if rain is None:
+        return ("Rain Level:", "Not available")
+    else:
+        return (f"Rain Level:", f"{rain:.1f}%")
 
 def get_latest_weather_data():
     """Get the latest weather data."""
