@@ -11,4 +11,3 @@ from .water_level import WaterLevelSensor
 from .soil_moisture import SoilMoistureSensor
 from .dht22 import DHT22Sensor
 from .lcd_16x2 import LCD
-from .relay_automation import RelayAutomation

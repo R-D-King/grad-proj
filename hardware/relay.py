@@ -7,6 +7,7 @@ try:
     GPIO_AVAILABLE = True
 except ImportError:
     GPIO_AVAILABLE = False
+    print("RPi.GPIO not available, using simulation mode")
 
 class Relay:
     """Class for controlling a relay."""
@@ -34,6 +35,7 @@ class Relay:
         if not self.simulation and GPIO_AVAILABLE:
             GPIO.output(self.pin, GPIO.LOW)  # Active LOW
         self.state = True
+        print(f"Relay {self.name} turned ON")
         return True
     
     def turn_off(self):
@@ -41,6 +43,7 @@ class Relay:
         if not self.simulation and GPIO_AVAILABLE:
             GPIO.output(self.pin, GPIO.HIGH)  # Inactive HIGH
         self.state = False
+        print(f"Relay {self.name} turned OFF")
         return True
     
     def toggle(self):
