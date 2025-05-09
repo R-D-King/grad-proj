@@ -59,35 +59,86 @@ class LCD:
     
     def clear(self):
         """Clear the display."""
+        if not self.simulation and self.lcd:
+            try:
+                self.lcd.clear()
+            except Exception as e:
+                logger.error(f"Error clearing LCD: {e}")
+        
+        # Clear simulation display
+        for row in range(self.rows):
+            for col in range(self.cols):
+                self.display_content[row][col] = ' '
+        
         if self.simulation:
-            self.display_content = [
-                [' ' for _ in range(self.cols)] for _ in range(self.rows)
-            ]
             self._print_simulation()
-        else:
-            self.lcd.clear()
+    
+    def write_line(self, row, text):
+        """Write text to a specific row on the display.
+        
+        Args:
+            row: Row number (0 or 1 for a 16x2 display)
+            text: Text to display (will be truncated if longer than display width)
+        """
+        if row < 0 or row >= self.rows:
+            logger.error(f"Invalid row: {row}")
+            return
+        
+        # Truncate text if needed
+        text = str(text)[:self.cols]
+        
+        # Pad text to fill the row
+        text = text.ljust(self.cols)
+        
+        if not self.simulation and self.lcd:
+            try:
+                self.lcd.cursor_pos = (row, 0)
+                self.lcd.write_string(text)
+            except Exception as e:
+                logger.error(f"Error writing to LCD: {e}")
+        
+        # Update simulation display
+        for col, char in enumerate(text):
+            if col < self.cols:
+                self.display_content[row][col] = char
+        
+        if self.simulation:
+            self._print_simulation()
     
     def write_string(self, text, row=0, col=0):
-        """Write a string to the display at the specified position.
+        """Write text to the display at a specific position.
         
         Args:
             text: Text to display
-            row: Row number (0-based)
-            col: Column number (0-based)
+            row: Starting row (default: 0)
+            col: Starting column (default: 0)
         """
-        # Ensure text fits within display
-        text = text[:self.cols - col]
+        if row < 0 or row >= self.rows or col < 0 or col >= self.cols:
+            logger.error(f"Invalid position: row={row}, col={col}")
+            return
+        
+        if not self.simulation and self.lcd:
+            try:
+                self.lcd.cursor_pos = (row, col)
+                self.lcd.write_string(text)
+            except Exception as e:
+                logger.error(f"Error writing to LCD: {e}")
+        
+        # Update simulation display
+        for i, char in enumerate(text):
+            if col + i < self.cols:
+                self.display_content[row][col + i] = char
+            else:
+                # Move to next row if text is too long
+                next_row = row + 1
+                next_col = col + i - self.cols
+                if next_row < self.rows and next_col < self.cols:
+                    self.display_content[next_row][next_col] = char
+                else:
+                    break
         
         if self.simulation:
-            # Update simulated display content
-            for i, char in enumerate(text):
-                if col + i < self.cols:
-                    self.display_content[row][col + i] = char
             self._print_simulation()
-        else:
-            # Set cursor position and write to physical display
-            self.lcd.cursor_pos = (row, col)
-            self.lcd.write_string(text)
     
     def _print_simulation(self):
         """Print the simulated display to the console."""
@@ -97,15 +148,21 @@ class LCD:
         display_str += "=" * (self.cols + 2)
         logger.info(display_str)
     
-    def close(self, clear=True):
-        """Close the LCD connection and clean up GPIO pins."""
+    def close(self):
+        """Close the LCD connection and clean up."""
         if not self.simulation and self.lcd:
-            if clear:
-                self.lcd.clear()
-            self.lcd.close(clear=clear)
-            # Clean up GPIO pins
-            pins_to_cleanup = [self.pin_rs, self.pin_e] + self.pins_data
-            self.gpio.cleanup(pins_to_cleanup)
+            try:
+                self.clear()
+                if hasattr(self, 'gpio'):
+                    self.gpio.cleanup()
+            except Exception as e:
+                logger.error(f"Error closing LCD: {e}")
+
+# Register cleanup function to run on exit
+@atexit.register
+def cleanup():
+    """Clean up resources on exit."""
+    logger.info("Cleaning up LCD resources")
 
 # Function to load configuration
 def load_config():

@@ -14,3 +14,4 @@ requests==2.31.0
 # For sensors
 adafruit-circuitpython-dht==3.7.8
 # RPi.GPIO and spidev are installed via apt
+RPLCD==1.3.1

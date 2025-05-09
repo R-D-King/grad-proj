@@ -53,21 +53,58 @@ class SensorController:
         logger.info("SocketIO instance set for sensor controller")
     
     def set_app(self, app):
-        """Set the Flask app instance for creating application contexts."""
+        """Set the Flask app instance for the sensor controller."""
         self.app = app
+        
+        # Now that we have the app, we can get the proper configuration
+        with app.app_context():
+            try:
+                # Get DHT pin from config
+                dht_pin = app.config.get('hardware', {}).get('sensors', {}).get('pins', {}).get('dht22', 26)
+                
+                # If the pin has changed and we're not in simulation mode, reinitialize the DHT sensor
+                if dht_pin != self.dht_pin and not self.simulation and platform.system() == "Linux":
+                    logger.info(f"Updating DHT pin from {self.dht_pin} to {dht_pin}")
+                    self.dht_pin = dht_pin
+                    
+                    # Reinitialize the DHT sensor with the correct pin
+                    try:
+                        import adafruit_dht
+                        import board
+                        pin_map = {
+                            4: board.D4,
+                            17: board.D17,
+                            18: board.D18,
+                            21: board.D21,
+                            22: board.D22,
+                            23: board.D23,
+                            24: board.D24,
+                            25: board.D25,
+                            26: board.D26,
+                            # Add more pins as needed
+                        }
+                        pin = pin_map.get(dht_pin, board.D26)
+                        
+                        # Clean up old sensor if it exists
+                        if hasattr(self, 'dht_sensor') and hasattr(self.dht_sensor, 'exit'):
+                            self.dht_sensor.exit()
+                            
+                        self.dht_sensor = adafruit_dht.DHT22(pin)
+                        logger.info(f"DHT22 sensor reinitialized on pin {dht_pin}")
+                    except Exception as e:
+                        logger.error(f"Failed to reinitialize DHT22 sensor: {e}")
+            except Exception as e:
+                logger.warning(f"Could not get DHT pin from config: {e}")
         logger.info("Flask app instance set for sensor controller")
     
     def _initialize_sensors(self):
         """Initialize the appropriate sensors based on platform."""
-        # Get pin configuration from config
-        try:
-            from flask import current_app
-            config = current_app.config.get_namespace('')
-            dht_pin = config.get('hardware', {}).get('sensors', {}).get('pins', {}).get('dht22', 26)
-        except Exception as e:
-            logger.warning(f"Could not get DHT pin from config, using default: {e}")
-            dht_pin = 26  # Default pin if config not available
-            
+        # Get pin configuration from config - without using Flask's current_app
+        dht_pin = 26  # Default pin
+        
+        # We'll set the actual pin later when the app context is available
+        self.dht_pin = dht_pin
+        
         if self.simulation or platform.system() != "Linux":
             logger.info("Using simulated sensors")
             from hardware.water_level import WaterLevelSensor
@@ -87,7 +124,7 @@ class SensorController:
             logger.info("Water level sensor not available - using simulated data")
             
             try:
-                # Initialize DHT22 sensor with pin from config
+                # Initialize DHT22 sensor with default pin for now
                 import adafruit_dht
                 import board
                 pin_map = {
