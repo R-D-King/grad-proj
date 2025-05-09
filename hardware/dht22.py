@@ -6,11 +6,11 @@ import adafruit_dht
 class DHT22Sensor:
     """DHT22 temperature and humidity sensor interface."""
     
-    def __init__(self, pin=4, simulation=False, max_retries=3):
+    def __init__(self, pin=26, simulation=False, max_retries=3):
         """Initialize the DHT22 sensor.
         
         Args:
-            pin: GPIO pin number (default: 4)
+            pin: GPIO pin number (default: 26)
             simulation: Whether to simulate readings
             max_retries: Maximum number of retries for failed readings
         """

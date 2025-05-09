@@ -24,9 +24,7 @@ DB_UPDATE_INTERVAL = int(os.environ.get('DB_UPDATE_INTERVAL', 60))  # 60 seconds
 
 simulation_mode = platform.system() != "Linux"
 sensor_controller = SensorController(
-    simulation=simulation_mode,
-    ui_update_interval=UI_UPDATE_INTERVAL,
-    db_update_interval=DB_UPDATE_INTERVAL
+    simulation=simulation_mode
 )
 
 # LCD display instance - will be initialized in init_app
