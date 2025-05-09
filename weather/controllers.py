@@ -70,13 +70,14 @@ def init_app(app):
             simulation=simulation
         )
         
-        # Display IP and port on LCD
+        # Display network name, IP and port on LCD
+        network_ssid = get_network_ssid()
         ip_address = app.config.get('IP_ADDRESS', '127.0.0.1')
         port = app.config.get('PORT', 5000)
         
         lcd.clear()
-        lcd.write_line(0, f"IP:{ip_address}")
-        lcd.write_line(1, f"Port:{port}")
+        lcd.write_line(0, f"Network: {network_ssid}")
+        lcd.write_line(1, f"IP: {ip_address}")
         
         # Start LCD update thread
         lcd_running = True
@@ -98,33 +99,33 @@ def lcd_update_loop(app):
     
     # Define display modes and their data
     display_modes = [
-        # Mode 0: IP and Port
+        # Mode 0: Network Name (SSID) - Now first in the list
+        lambda: (f"Network:", 
+                f"{get_network_ssid()}"),
+        
+        # Mode 1: IP and Port
         lambda: (f"IP:{app.config.get('IP_ADDRESS', '127.0.0.1')[:16]}", 
                 f"Port:{app.config.get('PORT', 5000)}"),
         
-        # Mode 1: Temperature and Humidity
+        # Mode 2: Temperature and Humidity
         lambda: (f"Temp: {sensor_controller.get_latest_readings().get('temperature', 0):.1f}C", 
                 f"Humid: {sensor_controller.get_latest_readings().get('humidity', 0):.1f}%"),
         
-        # Mode 2: Soil Moisture
+        # Mode 3: Soil Moisture
         lambda: (f"Soil Moisture:", 
                 f"{sensor_controller.get_latest_readings().get('soil_moisture', 0):.1f}%"),
         
-        # Mode 3: Pressure from BMP180
+        # Mode 4: Pressure from BMP180
         lambda: (f"Pressure:", 
                 f"{sensor_controller.get_latest_readings().get('pressure', 0):.1f} hPa"),
         
-        # Mode 4: Light Percentage from LDR
+        # Mode 5: Light Percentage from LDR
         lambda: (f"Light Level:", 
                 f"{sensor_controller.get_latest_readings().get('light', 0):.1f}%"),
                 
-        # Mode 5: Rain Percentage
+        # Mode 6: Rain Percentage
         lambda: (f"Rain Level:", 
-                f"{sensor_controller.get_latest_readings().get('rain', 0):.1f}%"),
-                
-        # Mode 6: Network Name (SSID)
-        lambda: (f"Network:", 
-                f"{get_network_ssid()}")
+                f"{sensor_controller.get_latest_readings().get('rain', 0):.1f}%")
     ]
     
     current_mode = 0

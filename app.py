@@ -12,6 +12,8 @@ from shared.socketio import socketio
 import os
 import logging
 import socket
+import platform  # Add platform import here
+import subprocess  # Add subprocess import for the SSID function
 from shared.config import Config
 from shared.routes import shared_bp
 from irrigation.routes import irrigation_bp

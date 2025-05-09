@@ -145,7 +145,12 @@ class SensorController:
             return None
         
         try:
-            return self.sensors['pressure'].read()
+            # For BMP180, read() returns a tuple (temperature, pressure, altitude)
+            # We need to extract just the pressure value (second element)
+            readings = self.sensors['pressure'].read()
+            if isinstance(readings, tuple) and len(readings) >= 2:
+                return readings[1]  # Extract pressure from tuple
+            return readings
         except Exception as e:
             print(f"Error reading pressure sensor: {e}")
             return None
@@ -158,6 +163,9 @@ class SensorController:
             return None
         
         try:
+            # For LDR sensor, we need to call get_light_percentage()
+            if hasattr(self.sensors['light'], 'get_light_percentage'):
+                return self.sensors['light'].get_light_percentage()
             return self.sensors['light'].read()
         except Exception as e:
             print(f"Error reading light sensor: {e}")
@@ -171,6 +179,9 @@ class SensorController:
             return None
         
         try:
+            # For rain sensor, we need to call get_rain_percentage() if available
+            if hasattr(self.sensors['rain'], 'get_rain_percentage'):
+                return self.sensors['rain'].get_rain_percentage()
             return self.sensors['rain'].read()
         except Exception as e:
             print(f"Error reading rain sensor: {e}")
@@ -603,4 +614,3 @@ class SensorController:
             return self.ldr_sensor.get_light_percentage()
         except Exception as e:
             logger.error(f"Error initializing LDR sensor: {e}")
-            return 0
