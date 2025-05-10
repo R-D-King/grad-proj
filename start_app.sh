@@ -1,8 +1,8 @@
 #!/bin/bash
 # Wait for network
-while ! ping -c 1 -W 1 google.com &> /dev/null; do
-    sleep 1
-done
+#while ! ping -c 1 -W 1 google.com &> /dev/null; do
+#    sleep 1
+#done
 
 # Explicitly change to app directory
 cd /home/pi/Documents/grad-proj || exit
