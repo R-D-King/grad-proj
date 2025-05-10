@@ -27,11 +27,6 @@ Best for development/debugging when you need to see and interact with the termin
 3. Add this content:
    ```bash
    #!/bin/bash
-   # Wait for network
-   while ! ping -c 1 -W 1 google.com &> /dev/null; do
-       sleep 1
-   done
-
    # Explicitly change to app directory
    cd /home/pi/Documents/grad-proj || exit
 
@@ -95,11 +90,7 @@ Best for headless operation when you might need to check logs occasionally.
 3. Add this content:
    ```bash
    #!/bin/bash
-   # Wait for network
-   while ! ping -c 1 -W 1 google.com &> /dev/null; do
-       sleep 1
-   done
-
+   #!/bin/bash
    # Explicitly change to app directory
    cd /home/pi/Documents/grad-proj || exit
 
@@ -112,8 +103,8 @@ Best for headless operation when you might need to check logs occasionally.
 
    # Run app in screen session with logging
    screen -L -Logfile /home/pi/app_screen.log -dmS myapp \
-     bash -c "source /home/pi/Documents/grad-proj/venv/bin/activate && \
-     python3 app.py --host=0.0.0.0 --port=5000"
+   bash -c "source /home/pi/Documents/grad-proj/venv/bin/activate && \
+   python3 app.py --host=0.0.0.0 --port=5000"
    ```
 
 4. Make executable:

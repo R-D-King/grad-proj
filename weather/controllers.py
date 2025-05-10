@@ -77,7 +77,7 @@ def init_app(app):
         
         lcd.clear()
         lcd.write_line(0, f"Network: {network_ssid}")
-        lcd.write_line(1, f"IP: {ip_address}")
+        lcd.write_line(1, f"{ip_address}")
         
         # Start LCD update thread
         lcd_running = True
@@ -161,7 +161,7 @@ def lcd_update_loop(app):
                 f"{get_network_ssid()}"),
         
         # Mode 1: IP and Port
-        lambda: (f"IP:{app.config.get('IP_ADDRESS', '127.0.0.1')[:16]}", 
+        lambda: (f"{app.config.get('IP_ADDRESS', '127.0.0.1')[:16]}", 
                 f"Port:{app.config.get('PORT', 5000)}"),
         
         # Mode 2: Temperature and Humidity
