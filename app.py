@@ -97,13 +97,15 @@ def create_app(config_class=Config):
         """Handle SIGINT (Ctrl+C) gracefully."""
         print("\nReceived SIGINT")
         
-        # Display shutdown message on LCD if available
+        # Use a non-blocking approach for LCD
         try:
-            from weather.controllers import display_shutdown
-            display_shutdown()
-            time.sleep(2)  # Give more time for the message to be displayed
+            from weather.controllers import sensor_controller
+            # Stop all monitoring threads first
+            if hasattr(sensor_controller, 'running'):
+                sensor_controller.running = False
+                time.sleep(0.5)  # Brief pause to let threads notice the change
         except Exception as e:
-            print(f"Error displaying shutdown message: {e}")
+            print(f"Error stopping sensor controller: {e}")
         
         # Clean up any GPIO resources
         try:
@@ -111,19 +113,8 @@ def create_app(config_class=Config):
             # Clean up GPIO resources
             import RPi.GPIO as GPIO
             GPIO.cleanup()
-            
-            # Close any open I2C bus connections
-            from weather.controllers import sensor_controller
-            if hasattr(sensor_controller, 'sensors'):
-                for sensor_name, sensor in sensor_controller.sensors.items():
-                    if hasattr(sensor, 'bus') and sensor.bus is not None:
-                        try:
-                            sensor.bus.close()
-                            print(f"Closed I2C bus for {sensor_name} sensor")
-                        except Exception as e:
-                            print(f"Error closing I2C bus for {sensor_name} sensor: {e}")
         except Exception as e:
-            print(f"Error during cleanup: {e}")
+            print(f"Error during GPIO cleanup: {e}")
         
         # Exit the application
         sys.exit(0)

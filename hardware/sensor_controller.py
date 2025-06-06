@@ -56,6 +56,7 @@ class SensorController:
         self.last_log_day = None
         self.validation_enabled = True
         self.validation_limits = {}
+        self.logging_thread = None
         
         # Initialize sensors based on simulation mode
         self._initialize_sensors()
@@ -65,9 +66,12 @@ class SensorController:
         try:
             if self.simulation:
                 from .sensor_simulation import SimulatedSensor
-                self.sensors['dht'] = SimulatedSensor('dht', min_value=0, max_value=40, default_value=22)
-                self.sensors['soil_moisture'] = SimulatedSensor('soil_moisture', min_value=0, max_value=100, default_value=50)
-                self.sensors['water_level'] = SimulatedSensor('water_level', min_value=0, max_value=100, default_value=75)
+                self.dht_sensor = SimulatedSensor('dht', min_value=0, max_value=40, default_value=22)
+                self.soil_moisture_sensor = SimulatedSensor('soil_moisture', min_value=0, max_value=100, default_value=50)
+                self.water_level_sensor = SimulatedSensor('water_level', min_value=0, max_value=100, default_value=75)
+                self.sensors['dht'] = self.dht_sensor
+                self.sensors['soil_moisture'] = self.soil_moisture_sensor
+                self.sensors['water_level'] = self.water_level_sensor
                 self.sensors['pressure'] = SimulatedSensor('pressure', min_value=980, max_value=1050, default_value=1013)
                 self.sensors['light'] = SimulatedSensor('light', min_value=0, max_value=100, default_value=60)
                 self.sensors['rain'] = SimulatedSensor('rain', min_value=0, max_value=100, default_value=10)
@@ -75,7 +79,7 @@ class SensorController:
                 # Initialize hardware sensors
                 try:
                     from .dht22 import DHT22Sensor
-                    self.sensors['dht'] = DHT22Sensor(pin=4)
+                    self.dht_sensor = DHT22Sensor(pin=4)
                 except Exception as e:
                     print(f"Error initializing DHT22 sensor: {e}")
                     self.sensors['dht'] = None
@@ -280,8 +284,14 @@ class SensorController:
     def _initialize_csv_logging(self, config):
         """Initialize CSV logging based on configuration."""
         try:
-            # Get logging configuration
+            # Get logging configuration with fallback to empty dict
             logging_config = config.get('logging', {})
+            
+            # If logging_config is None, use an empty dict
+            if logging_config is None:
+                logging_config = {}
+                logger.warning("Logging configuration not found, using defaults")
+            
             self.csv_logging_enabled = logging_config.get('csv_enabled', False)
             
             if not self.csv_logging_enabled:
@@ -312,13 +322,15 @@ class SensorController:
                 'rain': {'min': 0.0, 'max': 100.0}
             })
             
-            # Start logging thread
-            self.logging_thread = threading.Thread(target=self._csv_logging_loop)
-            self.logging_thread.daemon = True
-            self.logging_thread.start()
-            logger.info(f"CSV logging initialized with interval {self.log_interval}s")
+            # Start logging thread only if we're running
+            if self.running:
+                self.logging_thread = threading.Thread(target=self._csv_logging_loop)
+                self.logging_thread.daemon = True
+                self.logging_thread.start()
+                logger.info(f"CSV logging initialized with interval {self.log_interval}s")
         except Exception as e:
             logger.error(f"Error initializing CSV logging: {e}")
+            self.csv_logging_enabled = False
     
     def _setup_csv_file(self):
         """Setup CSV file with headers including units."""
@@ -441,7 +453,6 @@ class SensorController:
         }
         return status
     
-    # Modify your start_monitoring method to emit initial status
     def start_monitoring(self):
         """Start monitoring sensors at configured intervals."""
         if self.running:
@@ -455,6 +466,13 @@ class SensorController:
             logger.warning("SocketIO not set. Real-time updates will not be available.")
         
         self.running = True
+        
+        # Start CSV logging thread if enabled
+        if self.csv_logging_enabled and not self.logging_thread:
+            self.logging_thread = threading.Thread(target=self._csv_logging_loop)
+            self.logging_thread.daemon = True
+            self.logging_thread.start()
+            logger.info(f"CSV logging started with interval {self.log_interval}s")
         
         # Start UI update thread
         self.ui_thread = threading.Thread(target=self._ui_monitoring_loop)
