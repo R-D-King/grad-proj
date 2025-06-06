@@ -79,7 +79,7 @@ class SensorController:
                 # Initialize hardware sensors
                 try:
                     from .dht22 import DHT22Sensor
-                    self.dht_sensor = DHT22Sensor(pin=4)
+                    self.dht_sensor = DHT22Sensor(pin=26)
                 except Exception as e:
                     print(f"Error initializing DHT22 sensor: {e}")
                     self.sensors['dht'] = None
@@ -93,7 +93,7 @@ class SensorController:
                 
                 try:
                     from .water_level import WaterLevelSensor
-                    self.sensors['water_level'] = WaterLevelSensor(pin=17)
+                    self.water_level_sensor = WaterLevelSensor(pin=17)
                 except Exception as e:
                     print(f"Error initializing water level sensor: {e}")
                     self.sensors['water_level'] = None
