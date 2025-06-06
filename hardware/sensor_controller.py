@@ -300,11 +300,6 @@ class SensorController:
                 'light': {'min': 0.0, 'max': 100.0}, 'rain': {'min': 0.0, 'max': 100.0}
             })
             
-            if self.running:
-                self.logging_thread = threading.Thread(target=self._csv_logging_loop)
-                self.logging_thread.daemon = True
-                self.logging_thread.start()
-                logger.info(f"CSV logging initialized with interval {self.log_interval}s")
         except Exception as e:
             logger.error(f"Error initializing CSV logging: {e}")
             self.csv_logging_enabled = False
@@ -371,10 +366,14 @@ class SensorController:
         """Background thread for logging sensor data to CSV."""
         while self.running:
             try:
+                # Check if we need a new CSV file (day changed)
                 today = datetime.now().day
                 if self.last_log_day != today:
+                    # Close previous file if open
                     if self.csv_file:
                         self.csv_file.close()
+                    
+                    # Create new CSV file for the day
                     self.csv_file, self.csv_writer = self._setup_csv_file()
                     self.last_log_day = today
                     logger.info(f"Created new log file for {datetime.now().strftime('%Y-%m-%d')}")
@@ -419,6 +418,11 @@ class SensorController:
         self.running = True
         
         if self.csv_logging_enabled and not self.logging_thread:
+            # Set up the initial CSV file before starting the thread
+            self.csv_file, self.csv_writer = self._setup_csv_file()
+            self.last_log_day = datetime.now().day
+            logger.info(f"Logging to {self.csv_file.name}")
+
             self.logging_thread = threading.Thread(target=self._csv_logging_loop)
             self.logging_thread.daemon = True
             self.logging_thread.start()
@@ -462,7 +466,7 @@ class SensorController:
         """Background thread for updating database with sensor readings."""
         while self.running:
             try:
-                now = time.time()
+                now = a= time.time()
                 if now - self.last_db_update >= self.db_update_interval:
                     readings = self.update_readings()
                     with self.app.app_context():
