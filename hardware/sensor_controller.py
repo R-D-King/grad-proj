@@ -40,6 +40,12 @@ class SensorController:
         self.last_ui_update = 0
         self.last_db_update = 0
         
+        # Initialize attributes to prevent 'object has no attribute' errors
+        self.dht_pin = 26  # Default pin
+        self.dht_sensor = None
+        self.soil_moisture_sensor = None
+        self.water_level_sensor = None
+        
         # CSV logging attributes
         self.csv_logging_enabled = False
         self.data_folder = None
