@@ -27,7 +27,8 @@ class Config:
         "hardware": "hardware.json",
         "irrigation": "irrigation.json",
         "database": "database.json",
-        "server": "server.json"
+        "server": "server.json",
+        "logging": "logging.json"  # Added logging configuration
     }
     
     # Default hardware configuration

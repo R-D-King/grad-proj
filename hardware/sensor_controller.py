@@ -7,6 +7,8 @@ import platform
 import threading
 from datetime import datetime
 from flask import current_app
+import os
+import csv
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -37,6 +39,17 @@ class SensorController:
         self.db_update_interval = 60  # Default value
         self.last_ui_update = 0
         self.last_db_update = 0
+        
+        # CSV logging attributes
+        self.csv_logging_enabled = False
+        self.data_folder = None
+        self.log_interval = 60
+        self.timestamp_format = '%Y-%m-%d %H:%M:%S'
+        self.csv_file = None
+        self.csv_writer = None
+        self.last_log_day = None
+        self.validation_enabled = True
+        self.validation_limits = {}
         
         # Initialize sensors based on simulation mode
         self._initialize_sensors()
@@ -251,71 +264,166 @@ class SensorController:
                         logger.info(f"DHT22 sensor reinitialized on pin {dht_pin}")
                     except Exception as e:
                         logger.error(f"Failed to reinitialize DHT22 sensor: {e}")
+                        
+                # Initialize CSV logging if enabled
+                self._initialize_csv_logging(app.config)
             except Exception as e:
                 logger.warning(f"Could not get DHT pin from config: {e}")
         logger.info("Flask app instance set for sensor controller")
     
-    def _initialize_sensors(self):
-        """Initialize the appropriate sensors based on platform."""
-        # Get pin configuration from config - without using Flask's current_app
-        dht_pin = 26  # Default pin
+    def _initialize_csv_logging(self, config):
+        """Initialize CSV logging based on configuration."""
+        try:
+            # Get logging configuration
+            logging_config = config.get('logging', {})
+            self.csv_logging_enabled = logging_config.get('csv_enabled', False)
+            
+            if not self.csv_logging_enabled:
+                logger.info("CSV logging is disabled")
+                return
+                
+            # Get logging parameters
+            self.data_folder = os.path.expanduser(logging_config.get('data_folder', '~/sensor_data'))
+            self.log_interval = logging_config.get('log_interval', 60)
+            self.timestamp_format = logging_config.get('timestamp_format', '%Y-%m-%d %H:%M:%S')
+            
+            # Create data folder if it doesn't exist
+            os.makedirs(self.data_folder, exist_ok=True)
+            
+            # Initialize CSV file
+            self.csv_file = None
+            self.csv_writer = None
+            self.last_log_day = None
+            
+            # Get validation settings
+            self.validation_enabled = logging_config.get('validation_enabled', True)
+            self.validation_limits = logging_config.get('validation_limits', {
+                'temperature': {'min': -10.0, 'max': 50.0},
+                'humidity': {'min': 0.0, 'max': 100.0},
+                'soil_moisture': {'min': 0.0, 'max': 100.0},
+                'pressure': {'min': 900.0, 'max': 1100.0},
+                'light': {'min': 0.0, 'max': 100.0},
+                'rain': {'min': 0.0, 'max': 100.0}
+            })
+            
+            # Start logging thread
+            self.logging_thread = threading.Thread(target=self._csv_logging_loop)
+            self.logging_thread.daemon = True
+            self.logging_thread.start()
+            logger.info(f"CSV logging initialized with interval {self.log_interval}s")
+        except Exception as e:
+            logger.error(f"Error initializing CSV logging: {e}")
+    
+    def _setup_csv_file(self):
+        """Setup CSV file with headers including units."""
+        # Create filename based on current date
+        today = datetime.now().strftime('%Y-%m-%d')
+        csv_path = os.path.join(self.data_folder, f"{today}.csv")
         
-        # We'll set the actual pin later when the app context is available
-        self.dht_pin = dht_pin
+        # Check if file exists to determine if we need to write headers
+        file_exists = os.path.isfile(csv_path)
         
-        if self.simulation or platform.system() != "Linux":
-            logger.info("Using simulated sensors")
-            from hardware.water_level import WaterLevelSensor
-            self.water_level_sensor = WaterLevelSensor(simulation=True)
+        # Open file in append mode
+        csv_file = open(csv_path, 'a', newline='')
+        csv_writer = csv.writer(csv_file)
+        
+        # Write headers if file is new
+        if not file_exists:
+            headers = [
+                'Timestamp',
+                'Temperature (°C)',
+                'Humidity (%)',
+                'Soil Moisture (%)',
+                'Water Level (%)',
+                'Pressure (hPa)',
+                'Light Level (%)',
+                'Rain Level (%)'
+            ]
+            csv_writer.writerow(headers)
+        
+        return csv_file, csv_writer
+    
+    def _log_data_to_csv(self, data):
+        """Write sensor data to CSV file."""
+        # Format timestamp
+        timestamp = datetime.now().strftime(self.timestamp_format)
+        
+        # Prepare row with rounded values (2 decimal places for percentages)
+        row = [
+            timestamp,
+            round(data.get('temperature', 0), 1) if data.get('temperature') is not None else None,
+            round(data.get('humidity', 0), 1) if data.get('humidity') is not None else None,
+            round(data.get('soil_moisture', 0), 2) if data.get('soil_moisture') is not None else None,
+            round(data.get('water_level', 0), 2) if data.get('water_level') is not None else None,
+            round(data.get('pressure', 0), 1) if data.get('pressure') is not None else None,
+            round(data.get('light', 0), 2) if data.get('light') is not None else None,
+            round(data.get('rain', 0), 2) if data.get('rain') is not None else None
+        ]
+        
+        # Write to CSV
+        self.csv_writer.writerow(row)
+        self.csv_file.flush()  # Ensure data is written
+    
+    def _validate_readings(self, readings):
+        """Validate sensor readings against configured limits."""
+        if not self.validation_enabled:
+            return
             
-            # Import simulation modules for other sensors
-            from hardware.sensor_simulation import SimulatedDHT, SimulatedSoilMoisture
-            self.dht_sensor = SimulatedDHT()
-            self.soil_moisture_sensor = SimulatedSoilMoisture()
-        else:
-            # We're on Linux, likely a Raspberry Pi
-            logger.info("Initializing hardware sensors")
-            
-            # Initialize water level sensor with simulation mode since hardware is not available
-            from hardware.water_level import WaterLevelSensor
-            self.water_level_sensor = WaterLevelSensor(simulation=True)
-            logger.info("Water level sensor not available - using simulated data")
-            
+        # Validate temperature
+        if readings.get('temperature') is not None:
+            temp_limits = self.validation_limits.get('temperature', {'min': -10.0, 'max': 50.0})
+            if not (temp_limits['min'] <= readings['temperature'] <= temp_limits['max']):
+                logger.warning(f"Temperature {readings['temperature']}°C outside valid range")
+        
+        # Validate humidity
+        if readings.get('humidity') is not None:
+            humid_limits = self.validation_limits.get('humidity', {'min': 0.0, 'max': 100.0})
+            if not (humid_limits['min'] <= readings['humidity'] <= humid_limits['max']):
+                logger.warning(f"Humidity {readings['humidity']}% outside valid range")
+        
+        # Validate soil moisture
+        if readings.get('soil_moisture') is not None:
+            soil_limits = self.validation_limits.get('soil_moisture', {'min': 0.0, 'max': 100.0})
+            if not (soil_limits['min'] <= readings['soil_moisture'] <= soil_limits['max']):
+                logger.warning(f"Soil moisture {readings['soil_moisture']}% outside valid range")
+        
+        # Validate pressure
+        if readings.get('pressure') is not None:
+            pressure_limits = self.validation_limits.get('pressure', {'min': 900.0, 'max': 1100.0})
+            if not (pressure_limits['min'] <= readings['pressure'] <= pressure_limits['max']):
+                logger.warning(f"Pressure {readings['pressure']}hPa outside valid range")
+    
+    def _csv_logging_loop(self):
+        """Background thread for logging sensor data to CSV."""
+        while self.running:
             try:
-                # Initialize DHT22 sensor with default pin for now
-                import adafruit_dht
-                import board
-                pin_map = {
-                    4: board.D4,
-                    17: board.D17,
-                    18: board.D18,
-                    21: board.D21,
-                    22: board.D22,
-                    23: board.D23,
-                    24: board.D24,
-                    25: board.D25,
-                    26: board.D26,
-                    # Add more pins as needed
-                }
-                pin = pin_map.get(dht_pin, board.D26)  # Default to D26 if pin not in map
-                self.dht_sensor = adafruit_dht.DHT22(pin)
-                logger.info(f"DHT22 sensor initialized on pin {dht_pin}")
-            except (ImportError, NotImplementedError) as e:
-                logger.error(f"Failed to initialize DHT22 sensor: {e}")
-                from hardware.sensor_simulation import SimulatedDHT
-                self.dht_sensor = SimulatedDHT()
-                logger.info("Using simulated DHT22 sensor instead")
-            
-            try:
-                # Initialize soil moisture sensor using the existing module
-                import hardware.soil_moisture as soil_moisture
-                self.soil_moisture_sensor = soil_moisture
-                logger.info("Soil moisture sensor initialized")
+                # Check if we need a new CSV file (day changed)
+                today = datetime.now().day
+                if self.last_log_day != today:
+                    # Close previous file if open
+                    if self.csv_file:
+                        self.csv_file.close()
+                    
+                    # Create new CSV file for the day
+                    self.csv_file, self.csv_writer = self._setup_csv_file()
+                    self.last_log_day = today
+                    logger.info(f"Created new log file for {datetime.now().strftime('%Y-%m-%d')}")
+                
+                # Get latest readings
+                readings = self.update_readings()
+                
+                # Validate readings
+                self._validate_readings(readings)
+                
+                # Log data to CSV
+                self._log_data_to_csv(readings)
+                logger.debug(f"Logged data to CSV: {readings}")
+                
+                # Wait for next logging interval
+                time.sleep(self.log_interval)
             except Exception as e:
-                logger.error(f"Failed to initialize soil moisture sensor: {e}")
-                from hardware.sensor_simulation import SimulatedSoilMoisture
-                self.soil_moisture_sensor = SimulatedSoilMoisture()
-                logger.info("Using simulated soil moisture sensor instead")
+                logger.error(f"Error in CSV logging loop: {e}")
+                time.sleep(10)  # Wait before retrying
     
     # Add this method to your SensorController class
     def get_sensor_status(self):
@@ -455,17 +563,17 @@ class SensorController:
             if hasattr(self.soil_moisture_sensor, 'read'):
                 # Simulated sensor
                 moisture_data = self.soil_moisture_sensor.read()
-                readings['soil_moisture'] = moisture_data['moisture']
+                readings['soil_moisture'] = round(moisture_data['moisture'], 2)  # Round to 2 decimal places
             else:
                 # Hardware module
                 raw_value = self.soil_moisture_sensor.read_adc(self.soil_moisture_sensor.MOISTURE_CHANNEL)
-                readings['soil_moisture'] = self.soil_moisture_sensor.calculate_moisture_percentage(raw_value)
+                readings['soil_moisture'] = round(self.soil_moisture_sensor.calculate_moisture_percentage(raw_value), 2)  # Round to 2 decimal places
             logger.debug(f"Soil moisture: {readings['soil_moisture']}%")
         except Exception as e:
             logger.error(f"Error reading soil moisture sensor: {e}")
             # Provide realistic default value
             import random
-            readings['soil_moisture'] = round(random.uniform(30.0, 70.0), 1)  # Realistic soil moisture
+            readings['soil_moisture'] = round(random.uniform(30.0, 70.0), 2)  # Realistic soil moisture
             
         # Get water level - always use simulation since hardware is not available
         try:
@@ -474,12 +582,12 @@ class SensorController:
                 logger.info("Water level sensor hardware not available, using simulated data")
                 self._water_level_warning_shown = True
                 
-            readings['water_level'] = self.water_level_sensor.get_level()
+            readings['water_level'] = round(self.water_level_sensor.get_level(), 2)  # Round to 2 decimal places
             logger.debug(f"Water level (simulated): {readings['water_level']}%")
         except Exception as e:
             # Provide realistic default value
             import random
-            readings['water_level'] = round(random.uniform(50.0, 90.0), 1)  # Realistic water level
+            readings['water_level'] = round(random.uniform(50.0, 90.0), 2)  # Realistic water level
             
         # Update last readings
         self.last_readings = readings

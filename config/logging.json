@@ -1,0 +1,33 @@
+{
+  "csv_enabled": true,
+  "data_folder": "~/sensor_data",
+  "log_interval": 60,
+  "timestamp_format": "%Y-%m-%d %H:%M:%S",
+  "validation_enabled": true,
+  "validation_limits": {
+    "temperature": {
+      "min": -10.0,
+      "max": 50.0
+    },
+    "humidity": {
+      "min": 0.0,
+      "max": 100.0
+    },
+    "soil_moisture": {
+      "min": 0.0,
+      "max": 100.0
+    },
+    "pressure": {
+      "min": 900.0,
+      "max": 1100.0
+    },
+    "light": {
+      "min": 0.0,
+      "max": 100.0
+    },
+    "rain": {
+      "min": 0.0,
+      "max": 100.0
+    }
+  }
+}
