@@ -103,7 +103,7 @@ def create_app(config_class=Config):
             # Stop all monitoring threads first
             if hasattr(sensor_controller, 'running'):
                 sensor_controller.running = False
-                time.sleep(0.5)  # Brief pause to let threads notice the change
+                eventlet.sleep(0.5)  # Brief pause to let threads notice the change
         except Exception as e:
             print(f"Error stopping sensor controller: {e}")
         
