@@ -382,7 +382,7 @@ class SensorController:
                 readings = self.update_readings()
                 self._validate_readings(readings)
                 self._log_data_to_csv(readings)
-                logger.debug(f"Logged data to CSV: {readings}")
+                logger.info(f"Sensor data logged to CSV file.")
                 
                 time.sleep(self.log_interval)
             except Exception as e:
