@@ -278,16 +278,18 @@ class SensorController:
                 logger.warning("Logging configuration not found, using defaults")
             
             self.csv_logging_enabled = logging_config.get('csv_enabled', False)
+            logger.info(f"CSV logging enabled: {self.csv_logging_enabled}")
             
             if not self.csv_logging_enabled:
                 logger.info("CSV logging is disabled")
                 return
                 
             self.data_folder = os.path.expanduser(logging_config.get('data_folder', '~/sensor_data'))
+            logger.info(f"CSV data folder (expanded): {self.data_folder}")
+            os.makedirs(self.data_folder, exist_ok=True)
+            logger.info(f"Ensured data folder exists: {self.data_folder}")
             self.log_interval = logging_config.get('log_interval', 60)
             self.timestamp_format = logging_config.get('timestamp_format', '%Y-%m-%d %H:%M:%S')
-            
-            os.makedirs(self.data_folder, exist_ok=True)
             
             self.csv_file = None
             self.csv_writer = None
@@ -308,6 +310,7 @@ class SensorController:
         """Setup CSV file with headers including units."""
         today = datetime.now().strftime('%Y-%m-%d')
         csv_path = os.path.join(self.data_folder, f"{today}.csv")
+        logger.info(f"Setting up CSV file: {csv_path}")
         file_exists = os.path.isfile(csv_path)
         csv_file = open(csv_path, 'a', newline='')
         csv_writer = csv.writer(csv_file)
@@ -318,6 +321,7 @@ class SensorController:
                 'Water Level (%)', 'Pressure (hPa)', 'Light Level (%)', 'Rain Level (%)'
             ]
             csv_writer.writerow(headers)
+            logger.info(f"Wrote headers to new CSV file: {csv_path}")
         
         return csv_file, csv_writer
     
@@ -426,7 +430,7 @@ class SensorController:
             self.logging_thread = threading.Thread(target=self._csv_logging_loop)
             self.logging_thread.daemon = True
             self.logging_thread.start()
-            logger.info(f"CSV logging started with interval {self.log_interval}s")
+            logger.info(f"CSV logging thread started with interval {self.log_interval}s")
         
         self.ui_thread = threading.Thread(target=self._ui_monitoring_loop)
         self.ui_thread.daemon = True
