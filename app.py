@@ -10,7 +10,6 @@ from flask import Flask, render_template, request, has_request_context
 from shared.database import db
 from shared.socketio import socketio
 import os
-import logging
 import socket
 import platform  # Add platform import here
 import subprocess  # Add subprocess import for the SSID function
@@ -20,6 +19,7 @@ from irrigation.routes import irrigation_bp
 from weather.routes import weather_bp
 from reports.routes import reports_bp
 import json
+import logging
 
 # Set default configuration values for key operational parameters
 os.environ.setdefault('UI_UPDATE_INTERVAL', '1')  # 1 second default
@@ -54,6 +54,9 @@ def get_network_ssid():
         return "Unknown"
 
 def create_app(config_class=Config):
+    # Configure logging to show INFO level messages in the terminal
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    
     # Initialize configuration
     config = config_class()
     
@@ -68,12 +71,12 @@ def create_app(config_class=Config):
             try:
                 logging_config = json.load(f)
                 app.config['logging'] = logging_config
-                print("Successfully loaded logging configuration.")
+                logging.info("Successfully loaded logging configuration.")
             except json.JSONDecodeError as e:
-                print(f"ERROR: Could not parse logging.json: {e}")
+                logging.error(f"Could not parse logging.json: {e}")
     else:
-        print(f"WARNING: Logging config file not found at {logging_config_path}")
-    
+        logging.warning(f"Logging config file not found at {logging_config_path}")
+
     # Configure the database with an absolute path to instance/app.db
     basedir = os.path.abspath(os.path.dirname(__file__))
     db_path = os.path.join(basedir, 'instance', 'app.db')
@@ -110,7 +113,7 @@ def create_app(config_class=Config):
     
     def signal_handler(sig, frame):
         """Handle SIGINT (Ctrl+C) gracefully."""
-        print("\nReceived SIGINT")
+        logging.info("\nReceived SIGINT")
         
         # Use a non-blocking approach for LCD
         try:
@@ -120,16 +123,16 @@ def create_app(config_class=Config):
                 sensor_controller.running = False
                 eventlet.sleep(0.5)  # Brief pause to let threads notice the change
         except Exception as e:
-            print(f"Error stopping sensor controller: {e}")
+            logging.error(f"Error stopping sensor controller: {e}")
         
         # Clean up any GPIO resources
         try:
-            print("\nDe-initializing hardware resources...")
+            logging.info("\nDe-initializing hardware resources...")
             # Clean up GPIO resources
             import RPi.GPIO as GPIO
             GPIO.cleanup()
         except Exception as e:
-            print(f"Error during GPIO cleanup: {e}")
+            logging.error(f"Error during GPIO cleanup: {e}")
         
         # Exit the application
         sys.exit(0)
@@ -161,22 +164,22 @@ if __name__ == '__main__':
     debug = config.get('DEBUG', False)
     
     # Print server information first with actual IP address
-    print("\n" + "=" * 60)
-    print(f"Starting Irrigation Control System Server")
-    print(f"Local access:  http://localhost:{port}")
-    print(f"Network access: http://{ip_address}:{port}")
-    print("=" * 60 + "\n")
+    logging.info("\n" + "=" * 60)
+    logging.info(f"Starting Irrigation Control System Server")
+    logging.info(f"Local access:  http://localhost:{port}")
+    logging.info(f"Network access: http://{ip_address}:{port}")
+    logging.info("=" * 60 + "\n")
     
     # Print configuration information
-    print(f"UI update interval: {config.get('UI_UPDATE_INTERVAL', 1)} seconds")
-    print(f"Database update interval: {config.get('DB_UPDATE_INTERVAL', 60)} seconds")
+    logging.info(f"UI update interval: {config.get('UI_UPDATE_INTERVAL', 1)} seconds")
+    logging.info(f"Database update interval: {config.get('DB_UPDATE_INTERVAL', 60)} seconds")
     
     # Initialize weather controller with app context - moved here to run after server info is displayed
     from weather.controllers import init_app as init_weather
-    print("\nChecking connected devices:")
-    print("-" * 30)
+    logging.info("\nChecking connected devices:")
+    logging.info("-" * 30)
     init_weather(app)
-    print("-" * 30)
+    logging.info("-" * 30)
     
     # Start the server
     socketio.run(app, host=host, port=port, debug=debug)

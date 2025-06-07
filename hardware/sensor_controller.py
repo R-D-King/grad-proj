@@ -59,7 +59,6 @@ class SensorController:
                 from .sensor_simulation import SimulatedSensor
                 self.sensors['dht'] = SimulatedSensor('dht', min_value=0, max_value=40, default_value=22)
                 self.sensors['soil_moisture'] = SimulatedSensor('soil_moisture', min_value=0, max_value=100, default_value=50)
-                self.sensors['water_level'] = SimulatedSensor('water_level', min_value=0, max_value=100, default_value=75)
                 self.sensors['pressure'] = SimulatedSensor('pressure', min_value=980, max_value=1050, default_value=1013)
                 self.sensors['light'] = SimulatedSensor('light', min_value=0, max_value=100, default_value=60)
                 self.sensors['rain'] = SimulatedSensor('rain', min_value=0, max_value=100, default_value=10)
@@ -78,13 +77,6 @@ class SensorController:
                 except Exception as e:
                     print(f"Error initializing soil moisture sensor: {e}")
                     self.sensors['soil_moisture'] = None
-                
-                try:
-                    from .water_level import WaterLevelSensor
-                    self.sensors['water_level'] = WaterLevelSensor(pin=17)
-                except Exception as e:
-                    print(f"Error initializing water level sensor: {e}")
-                    self.sensors['water_level'] = None
                 
                 try:
                     from .bmp180 import BMP180Sensor
@@ -150,23 +142,6 @@ class SensorController:
             readings['soil_moisture'] = None
             if self.simulation:
                 readings['soil_moisture'] = round(random.uniform(30.0, 70.0), 2)
-
-        # Water Level
-        try:
-            water_level_sensor = self.sensors.get('water_level')
-            if water_level_sensor:
-                if hasattr(water_level_sensor, 'get_level'):
-                    readings['water_level'] = round(water_level_sensor.get_level(), 2)
-                else:
-                    readings['water_level'] = round(water_level_sensor.read(), 2)
-                logger.debug(f"Water level: {readings.get('water_level')}%")
-            else:
-                raise ValueError("Water level sensor not initialized")
-        except Exception as e:
-            logger.error(f"Error reading water level sensor: {e}")
-            readings['water_level'] = None
-            if self.simulation:
-                readings['water_level'] = round(random.uniform(50.0, 90.0), 2)
 
         # Pressure
         try:
@@ -319,7 +294,7 @@ class SensorController:
         if not file_exists:
             headers = [
                 'Timestamp', 'Temperature (°C)', 'Humidity (%)', 'Soil Moisture (%)',
-                'Water Level (%)', 'Pressure (hPa)', 'Light Level (%)', 'Rain Level (%)'
+                'Pressure (hPa)', 'Light Level (%)', 'Rain Level (%)'
             ]
             csv_writer.writerow(headers)
             logger.info(f"Wrote headers to new CSV file: {csv_path}")
@@ -334,7 +309,6 @@ class SensorController:
             round(data.get('temperature', 0), 1) if data.get('temperature') is not None else None,
             round(data.get('humidity', 0), 1) if data.get('humidity') is not None else None,
             round(data.get('soil_moisture', 0), 2) if data.get('soil_moisture') is not None else None,
-            round(data.get('water_level', 0), 2) if data.get('water_level') is not None else None,
             round(data.get('pressure', 0), 1) if data.get('pressure') is not None else None,
             round(data.get('light', 0), 2) if data.get('light') is not None else None,
             round(data.get('rain', 0), 2) if data.get('rain') is not None else None
@@ -408,7 +382,6 @@ class SensorController:
              for name in self.sensors:
                 status[f'{name}_simulated'] = self.simulation
 
-        status['water_simulated'] = True
         return status
     
     def start_monitoring(self):
