@@ -9,7 +9,6 @@ A web-based irrigation system with weather monitoring capabilities.
 - Preset management
 - Report generation
 - Pump control with duration tracking
-- Water level monitoring
 - Customizable data reports with filtering options
 - Temperature and humidity monitoring with DHT22 sensor
 - Soil moisture monitoring with capacitive soil moisture sensor
@@ -35,7 +34,6 @@ A web-based irrigation system with weather monitoring capabilities.
 2. Connect the sensors:
    - DHT22 temperature/humidity sensor to GPIO pin 4
    - Soil moisture sensor to SPI interface (MCP3008 ADC on channel 0)
-   - Water level sensor to GPIO pin 17
    - Light sensor (LDR) to MCP3008 ADC on channel 1
    - Rain sensor to MCP3008 ADC on channel 2
    - BMP180 pressure sensor to I2C bus
@@ -51,7 +49,6 @@ A web-based irrigation system with weather monitoring capabilities.
 - DHT22 temperature and humidity sensor
 - Capacitive soil moisture sensor
 - MCP3008 analog-to-digital converter (for soil moisture, LDR, and rain sensors)
-- Water level sensor
 - Light dependent resistor (LDR) for light level sensing
 - Rain sensor with analog output
 - BMP180 pressure and temperature sensor
@@ -84,13 +81,12 @@ A web-based irrigation system with weather monitoring capabilities.
   - `index.html` - Main application interface
 - `hardware/` - Hardware interface modules
   - `relay.py` - Relay control for pump
-  - `water_level.py` - Water level sensor interface
   - `pump.py` - Pump control logic
   - `soil_moisture.py` - Soil moisture sensor interface
   - `dht22.py` - DHT22 temperature and humidity sensor interface
   - `bmp180.py` - BMP180 pressure and temperature sensor interface
   - `ldr_aout.py` - Light dependent resistor sensor interface
-  - `rain-aout.py` - Rain sensor interface
+  - `rain_aout.py` - Rain sensor interface
   - `lcd_16x2.py` - 16x2 LCD display interface
   - `sensor_controller.py` - Unified sensor management
   - `sensor_simulation.py` - Sensor simulation for development
@@ -256,6 +252,25 @@ Similarly, the LDR sensor may need calibration for your lighting conditions:
 # Configuration
 
 The application can be configured using JSON configuration files in the `config` directory and environment variables for key operational parameters.
+
+## Logging Configuration
+
+Sensor data logging is configured via the `config/logging.json` file. This allows you to enable or disable CSV logging, define where data is saved, and set validation limits.
+
+```json
+{
+  "csv_enabled": true,
+  "data_folder": "~/sensor_data",
+  "log_interval": 60,
+  "timestamp_format": "%Y-%m-%d %H:%M:%S",
+  "validation_enabled": true,
+  "validation_limits": { "...": "..." }
+}
+```
+
+- **`csv_enabled`**: Set to `true` to save sensor readings to daily CSV files.
+- **`data_folder`**: The directory where CSV files are stored. The default `~/sensor_data` resolves to the home directory of the user running the application (e.g., `/home/pi/sensor_data`). A new file is created for each day.
+- **`log_interval`**: The frequency in seconds for writing data to the CSV file. This is independent of the database update interval.
 
 ## Environment Variables
 
