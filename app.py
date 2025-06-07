@@ -19,6 +19,8 @@ from shared.routes import shared_bp
 from irrigation.routes import irrigation_bp
 from weather.routes import weather_bp
 from reports.routes import reports_bp
+import json
+
 # Set default configuration values for key operational parameters
 os.environ.setdefault('UI_UPDATE_INTERVAL', '1')  # 1 second default
 os.environ.setdefault('DB_UPDATE_INTERVAL', '60')  # 60 seconds default
@@ -58,6 +60,19 @@ def create_app(config_class=Config):
     # Create Flask app
     app = Flask(__name__)
     app.config.from_object(config)
+    
+    # Load and apply the logging configuration
+    logging_config_path = os.path.join(os.path.dirname(__file__), 'config', 'logging.json')
+    if os.path.exists(logging_config_path):
+        with open(logging_config_path, 'r') as f:
+            try:
+                logging_config = json.load(f)
+                app.config['logging'] = logging_config
+                print("Successfully loaded logging configuration.")
+            except json.JSONDecodeError as e:
+                print(f"ERROR: Could not parse logging.json: {e}")
+    else:
+        print(f"WARNING: Logging config file not found at {logging_config_path}")
     
     # Configure the database with an absolute path to instance/app.db
     basedir = os.path.abspath(os.path.dirname(__file__))
