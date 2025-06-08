@@ -10,6 +10,8 @@ class WeatherData(db.Model):
     humidity = db.Column(db.Float, nullable=False)
     soil_moisture = db.Column(db.Float, nullable=True)
     pressure = db.Column(db.Float, nullable=True)
+    light = db.Column(db.Float, nullable=True)
+    rain = db.Column(db.Float, nullable=True)
     timestamp = db.Column(db.DateTime, default=datetime.now)
     
     def to_dict(self):
@@ -20,5 +22,7 @@ class WeatherData(db.Model):
             'humidity': self.humidity,
             'soil_moisture': self.soil_moisture,
             'pressure': self.pressure,
+            'light': self.light,
+            'rain': self.rain,
             'timestamp': self.timestamp.isoformat() if self.timestamp else None
         }
