@@ -9,7 +9,7 @@ from datetime import datetime
 from flask import current_app
 import os
 import csv
-import json
+from threading import Lock
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -18,166 +18,79 @@ class SensorController:
     """Controller for managing all sensors in the system."""
     
     def __init__(self):
-        """Initialize the sensor controller.
-        """
+        """Initialize the sensor controller."""
         self.sensors = {}
-        self.last_readings = {}
-        self.running = False  # Initialize the running attribute
-        self.socketio = None  # Initialize socketio
-        self.app = None       # Initialize app
-        self.ui_update_interval = 1  # Default value
-        self.db_update_interval = 60  # Default value
-        self.last_ui_update = 0
-        self.last_db_update = 0
+        self.last_readings = {
+            'temperature': None, 'humidity': None, 'soil_moisture': None,
+            'pressure': None, 'light': None, 'rain': None, 'timestamp': None
+        }
+        self.running = False
+        self.socketio = None
+        self.app = None
         
-        self.dht_pin = 26  # Default pin
+        self.readings_lock = Lock()
+        self.sensor_threads = []
+
+        self.ui_update_interval = 0.5  # Broadcast data to UI every 500ms
+        self.db_update_interval = 60
         
-        # CSV logging attributes
         self.csv_logging_enabled = False
         self.data_folder = None
         self.log_interval = 60
-        self.timestamp_format = '%Y-%m-%d %H:%M:%S'
-        self.csv_file = None
         self.csv_writer = None
-        self.last_log_day = None
-        self.validation_enabled = True
-        self.validation_limits = {}
         self.logging_thread = None
         
         self._initialize_sensors()
     
     def _initialize_sensors(self):
-        """Initialize all sensors based on simulation mode."""
-        try:
-            # Initialize hardware sensors
-            try:
-                from .dht22 import DHT22Sensor
-                self.sensors['dht'] = DHT22Sensor(pin=26)
-            except Exception as e:
-                print(f"Error initializing DHT22 sensor: {e}")
-                self.sensors['dht'] = None
-            
-            try:
-                from .soil_moisture import SoilMoistureSensor
-                self.sensors['soil_moisture'] = SoilMoistureSensor()
-            except Exception as e:
-                print(f"Error initializing soil moisture sensor: {e}")
-                self.sensors['soil_moisture'] = None
-            
-            try:
-                from .bmp180 import BMP180Sensor
-                self.sensors['pressure'] = BMP180Sensor()
-            except Exception as e:
-                print(f"Error initializing BMP180 sensor: {e}")
-                self.sensors['pressure'] = None
-            
-            try:
-                from .ldr_aout import LDRSensor
-                self.sensors['light'] = LDRSensor()
-            except Exception as e:
-                print(f"Error initializing LDR sensor: {e}")
-                self.sensors['light'] = None
-            
-            try:
-                from .rain_aout import RainSensor
-                self.sensors['rain'] = RainSensor()
-            except Exception as e:
-                print(f"Error initializing rain sensor: {e}")
-                self.sensors['rain'] = None
-        except Exception as e:
-            print(f"Error initializing sensors: {e}")
-    
-    def update_readings(self):
-        """Update all sensor readings and return as a dictionary."""
-        readings = {'timestamp': datetime.now().isoformat()}
+        """Initialize all sensors and create placeholder if they fail."""
+        sensor_map = {
+            'dht': ('hardware.dht22', 'DHT22Sensor', {'pin': 26}),
+            'soil_moisture': ('hardware.soil_moisture', 'SoilMoistureSensor', {}),
+            'pressure': ('hardware.bmp180', 'BMP180Sensor', {}),
+            'light': ('hardware.ldr_aout', 'LDRSensor', {}),
+            'rain': ('hardware.rain_aout', 'RainSensor', {})
+        }
 
-        # Temperature and Humidity
-        try:
-            dht_sensor = self.sensors.get('dht')
-            if dht_sensor:
-                if hasattr(dht_sensor, 'temperature') and hasattr(dht_sensor, 'humidity'): # adafruit_dht
-                    temp = dht_sensor.temperature
-                    humid = dht_sensor.humidity
-                    readings['temperature'] = float(temp) if temp is not None else None
-                    readings['humidity'] = float(humid) if humid is not None else None
-                elif hasattr(dht_sensor, 'read'): # Other DHT libraries or simulation
-                    dht_data = dht_sensor.read()
-                    readings['temperature'] = float(dht_data['temperature']) if dht_data and dht_data.get('temperature') is not None else None
-                    readings['humidity'] = float(dht_data['humidity']) if dht_data and dht_data.get('humidity') is not None else None
-                logger.debug(f"DHT readings: {readings.get('temperature')}°C, {readings.get('humidity')}%")
-            else:
-                raise ValueError("DHT sensor not initialized")
-        except Exception as e:
-            logger.error(f"Error reading DHT sensor: {e}")
-            readings.update({'temperature': None, 'humidity': None})
+        for name, (module_path, class_name, kwargs) in sensor_map.items():
+            try:
+                module = __import__(module_path, fromlist=[class_name])
+                sensor_class = getattr(module, class_name)
+                self.sensors[name] = sensor_class(**kwargs)
+                logger.info(f"Successfully initialized {name} sensor.")
+            except Exception as e:
+                self.sensors[name] = None
+                logger.error(f"Failed to initialize {name} sensor: {e}. It will be disabled.")
 
-        # Soil Moisture
-        try:
-            soil_sensor = self.sensors.get('soil_moisture')
-            if soil_sensor:
-                value = soil_sensor.read()
-                readings['soil_moisture'] = round(value, 2) if value is not None else None
-                logger.debug(f"Soil moisture: {readings.get('soil_moisture')}%")
-            else:
-                raise ValueError("Soil moisture sensor not initialized")
-        except Exception as e:
-            logger.error(f"Error reading soil moisture sensor: {e}")
-            readings['soil_moisture'] = None
+    def _read_sensor_loop(self, sensor_name, sensor_instance, keys_to_update):
+        """Dedicated loop to read data from a single sensor."""
+        while self.running:
+            try:
+                reading = sensor_instance.read()
+                with self.readings_lock:
+                    if isinstance(keys_to_update, list): # For DHT
+                        for key in keys_to_update:
+                            self.last_readings[key] = reading.get(key)
+                    else: # For other sensors
+                        self.last_readings[keys_to_update] = reading
+                
+                # Dynamic sleep based on sensor type to prevent overwhelming hardware
+                sleep_interval = 2 if sensor_name == 'dht' else 1
+                time.sleep(sleep_interval)
 
-        # Pressure
-        try:
-            pressure_sensor = self.sensors.get('pressure')
-            if pressure_sensor:
-                pressure_data = pressure_sensor.read()
-                if isinstance(pressure_data, tuple) and len(pressure_data) >= 2:
-                    readings['pressure'] = pressure_data[1]
-                else:
-                    readings['pressure'] = pressure_data
-                logger.debug(f"Pressure: {readings.get('pressure')} hPa")
-            else:
-                raise ValueError("Pressure sensor not initialized")
-        except Exception as e:
-            logger.error(f"Error reading pressure sensor: {e}")
-            readings['pressure'] = None
-
-        # Light
-        try:
-            light_sensor = self.sensors.get('light')
-            if light_sensor:
-                if hasattr(light_sensor, 'get_light_percentage'):
-                    readings['light'] = light_sensor.get_light_percentage()
-                else:
-                    readings['light'] = light_sensor.read()
-                logger.debug(f"Light: {readings.get('light')}%")
-            else:
-                raise ValueError("Light sensor not initialized")
-        except Exception as e:
-            logger.error(f"Error reading light sensor: {e}")
-            readings['light'] = None
-
-        # Rain
-        try:
-            rain_sensor = self.sensors.get('rain')
-            if rain_sensor:
-                if hasattr(rain_sensor, 'get_rain_percentage'):
-                    readings['rain'] = rain_sensor.get_rain_percentage()
-                else:
-                    readings['rain'] = rain_sensor.read()
-                logger.debug(f"Rain: {readings.get('rain')}%")
-            else:
-                raise ValueError("Rain sensor not initialized")
-        except Exception as e:
-            logger.error(f"Error reading rain sensor: {e}")
-            readings['rain'] = None
-        
-        self.last_readings = readings
-        return readings
+            except Exception as e:
+                logger.error(f"Error reading from {sensor_name}: {e}")
+                with self.readings_lock:
+                    if isinstance(keys_to_update, list):
+                        for key in keys_to_update: self.last_readings[key] = None
+                    else: self.last_readings[keys_to_update] = None
+                time.sleep(5) # Longer sleep on error
 
     def get_latest_readings(self):
-        """Get the latest sensor readings."""
-        if not self.last_readings:
-            return self.update_readings()
-        return self.last_readings
+        """Get the latest sensor readings in a thread-safe way."""
+        with self.readings_lock:
+            self.last_readings['timestamp'] = datetime.now().isoformat()
+            return self.last_readings.copy()
 
     def set_socketio(self, socketio_instance):
         """Set the SocketIO instance to use for real-time updates."""
@@ -189,206 +102,138 @@ class SensorController:
         self.app = app
         with app.app_context():
             self._initialize_csv_logging(app.config)
+            # Override UI update interval from config if present
+            self.ui_update_interval = self.app.config.get('UI_UPDATE_INTERVAL', 0.5)
         logger.info("Flask app instance set for sensor controller")
     
     def _initialize_csv_logging(self, config):
         """Initialize CSV logging based on configuration."""
-        try:
-            logging_config = config.get('logging', {})
-            if logging_config is None:
-                logging_config = {}
-                logger.warning("Logging configuration not found, using defaults")
-            
-            self.csv_logging_enabled = logging_config.get('csv_enabled', False)
-            logger.info(f"CSV logging enabled: {self.csv_logging_enabled}")
-            
-            if not self.csv_logging_enabled:
-                logger.info("CSV logging is disabled")
-                return
-                
+        logging_config = config.get('logging', {})
+        self.csv_logging_enabled = logging_config.get('csv_enabled', False)
+        logger.info(f"CSV logging enabled: {self.csv_logging_enabled}")
+        
+        if self.csv_logging_enabled:
             self.data_folder = os.path.expanduser(logging_config.get('data_folder', '~/sensor_data'))
-            logger.info(f"CSV data folder (expanded): {self.data_folder}")
-            os.makedirs(self.data_folder, exist_ok=True)
-            logger.info(f"Ensured data folder exists: {self.data_folder}")
             self.log_interval = logging_config.get('log_interval', 60)
-            self.timestamp_format = logging_config.get('timestamp_format', '%Y-%m-%d %H:%M:%S')
-            
-            self.csv_file = None
-            self.csv_writer = None
-            self.last_log_day = None
-            
-            self.validation_enabled = logging_config.get('validation_enabled', True)
-            self.validation_limits = logging_config.get('validation_limits', {
-                'temperature': {'min': -10.0, 'max': 50.0}, 'humidity': {'min': 0.0, 'max': 100.0},
-                'soil_moisture': {'min': 0.0, 'max': 100.0}, 'pressure': {'min': 900.0, 'max': 1100.0},
-                'light': {'min': 0.0, 'max': 100.0}, 'rain': {'min': 0.0, 'max': 100.0}
-            })
-            
-        except Exception as e:
-            logger.error(f"Error initializing CSV logging: {e}")
-            self.csv_logging_enabled = False
-    
+            os.makedirs(self.data_folder, exist_ok=True)
+            logger.info(f"CSV data folder set to: {self.data_folder}")
+
+    def _broadcast_loop(self):
+        """Continuously broadcasts the latest data to the UI."""
+        logger.info(f"UI broadcast loop started. Interval: {self.ui_update_interval}s")
+        while self.running:
+            try:
+                readings = self.get_latest_readings()
+                statuses = self.get_sensor_statuses()
+                
+                if self.socketio:
+                    self.socketio.emit('sensor_update', readings)
+                    self.socketio.emit('sensor_status_update', statuses)
+                
+                self.socketio.sleep(self.ui_update_interval)
+            except Exception as e:
+                logger.error(f"Error in broadcast loop: {e}")
+                self.socketio.sleep(self.ui_update_interval)
+
     def _setup_csv_file(self):
         """Setup CSV file with headers including units."""
         today = datetime.now().strftime('%Y-%m-%d')
         csv_path = os.path.join(self.data_folder, f"{today}.csv")
-        logger.info(f"Setting up CSV file: {csv_path}")
         file_exists = os.path.isfile(csv_path)
+        
         csv_file = open(csv_path, 'a', newline='')
         csv_writer = csv.writer(csv_file)
         
         if not file_exists:
-            headers = [
-                'Timestamp', 'Temperature (°C)', 'Humidity (%)', 'Soil Moisture (%)',
-                'Pressure (hPa)', 'Light Level (%)', 'Rain Level (%)'
-            ]
+            headers = ['Timestamp', 'Temperature (°C)', 'Humidity (%)', 'Soil Moisture (%)',
+                       'Pressure (hPa)', 'Light Level (%)', 'Rain Level (%)']
             csv_writer.writerow(headers)
-            logger.info(f"Wrote headers to new CSV file: {csv_path}")
+            logger.info(f"Created new CSV log file: {csv_path}")
         
         return csv_file, csv_writer
-    
-    def _log_data_to_csv(self, data):
-        """Write sensor data to CSV file."""
-        timestamp = datetime.now().strftime(self.timestamp_format)
-        row = [
-            timestamp,
-            round(data.get('temperature', 0), 1) if data.get('temperature') is not None else None,
-            round(data.get('humidity', 0), 1) if data.get('humidity') is not None else None,
-            round(data.get('soil_moisture', 0), 2) if data.get('soil_moisture') is not None else None,
-            round(data.get('pressure', 0), 1) if data.get('pressure') is not None else None,
-            round(data.get('light', 0), 2) if data.get('light') is not None else None,
-            round(data.get('rain', 0), 2) if data.get('rain') is not None else None
-        ]
-        self.csv_writer.writerow(row)
-        self.csv_file.flush()
-    
-    def _validate_readings(self, readings):
-        """Validate sensor readings against configured limits."""
-        if not self.validation_enabled:
-            return
-            
-        if readings.get('temperature') is not None:
-            temp_limits = self.validation_limits.get('temperature', {'min': -10.0, 'max': 50.0})
-            if not (temp_limits['min'] <= readings['temperature'] <= temp_limits['max']):
-                logger.warning(f"Temperature {readings['temperature']}°C outside valid range")
-        
-        if readings.get('humidity') is not None:
-            humid_limits = self.validation_limits.get('humidity', {'min': 0.0, 'max': 100.0})
-            if not (humid_limits['min'] <= readings['humidity'] <= humid_limits['max']):
-                logger.warning(f"Humidity {readings['humidity']}% outside valid range")
-        
-        if readings.get('soil_moisture') is not None:
-            soil_limits = self.validation_limits.get('soil_moisture', {'min': 0.0, 'max': 100.0})
-            if not (soil_limits['min'] <= readings['soil_moisture'] <= soil_limits['max']):
-                logger.warning(f"Soil moisture {readings['soil_moisture']}% outside valid range")
-        
-        if readings.get('pressure') is not None:
-            pressure_limits = self.validation_limits.get('pressure', {'min': 900.0, 'max': 1100.0})
-            if not (pressure_limits['min'] <= readings['pressure'] <= pressure_limits['max']):
-                logger.warning(f"Pressure {readings['pressure']}hPa outside valid range")
-    
+
+    def _log_data_to_csv(self):
+        """Logs the latest data to the CSV file."""
+        if not self.csv_logging_enabled: return
+
+        try:
+            csv_file, csv_writer = self._setup_csv_file()
+            with csv_file:
+                readings = self.get_latest_readings()
+                row_data = [
+                    readings['timestamp'],
+                    readings.get('temperature'), readings.get('humidity'),
+                    readings.get('soil_moisture'), readings.get('pressure'),
+                    readings.get('light'), readings.get('rain')
+                ]
+                csv_writer.writerow(row_data)
+        except Exception as e:
+            logger.error(f"Failed to write to CSV: {e}")
+
     def _csv_logging_loop(self):
-        """Background thread for logging sensor data to CSV."""
+        """Periodically log data to CSV."""
+        logger.info(f"CSV logging loop started with interval {self.log_interval}s")
         while self.running:
             try:
-                # Check if we need a new CSV file (day changed)
-                today = datetime.now().day
-                if self.last_log_day != today:
-                    # Close previous file if open
-                    if self.csv_file:
-                        self.csv_file.close()
-                    
-                    # Create new CSV file for the day
-                    self.csv_file, self.csv_writer = self._setup_csv_file()
-                    self.last_log_day = today
-                    logger.info(f"Created new log file for {datetime.now().strftime('%Y-%m-%d')}")
-                
-                readings = self.update_readings()
-                self._validate_readings(readings)
-                self._log_data_to_csv(readings)
-                logger.info(f"Logged to CSV: {readings}")
-                
-                time.sleep(self.log_interval)
+                self._log_data_to_csv()
+                if self.socketio:
+                    self.socketio.sleep(self.log_interval)
+                else:
+                    time.sleep(self.log_interval)
             except Exception as e:
                 logger.error(f"Error in CSV logging loop: {e}")
-                time.sleep(10)
-    
+
     def get_sensor_statuses(self):
-        """Get the connection status of all initialized sensors."""
+        """Get the connection status of each sensor."""
         statuses = {}
-        for name, sensor_obj in self.sensors.items():
-            if sensor_obj:
-                statuses[name] = "Connected"
-            else:
-                statuses[name] = "Disconnected"
+        with self.readings_lock:
+            statuses['dht'] = 'Connected' if self.last_readings['temperature'] is not None else 'Disconnected'
+            statuses['soil_moisture'] = 'Connected' if self.last_readings['soil_moisture'] is not None else 'Disconnected'
+            statuses['pressure'] = 'Connected' if self.last_readings['pressure'] is not None else 'Disconnected'
+            statuses['light'] = 'Connected' if self.last_readings['light'] is not None else 'Disconnected'
+            statuses['rain'] = 'Connected' if self.last_readings['rain'] is not None else 'Disconnected'
         return statuses
-    
-    def start_csv_logging(self):
-        """Start the CSV logging thread if enabled."""
-        if not self.csv_logging_enabled:
-            logger.info("CSV logging is disabled, not starting thread.")
-            return
-
-        if self.logging_thread and self.logging_thread.is_alive():
-            logger.warning("CSV logging thread is already running.")
-            return
-
-        self.running = True  # Ensure the loop condition is met
-        self.logging_thread = threading.Thread(target=self._csv_logging_loop)
-        self.logging_thread.daemon = True
-        self.logging_thread.start()
-        logger.info(f"CSV logging thread started with interval {self.log_interval}s")
-
-    def _monitoring_loop(self):
-        """Continuously monitors sensors and emits data."""
-        logger.info("Sensor monitoring loop started.")
-        while self.running:
-            try:
-                # Update and broadcast sensor readings
-                readings = self.update_readings()
-                if self.socketio:
-                    self.socketio.emit('sensor_update', readings)
-                
-                # Update and broadcast sensor statuses
-                statuses = self.get_sensor_statuses()
-                if self.socketio:
-                    self.socketio.emit('sensor_status_update', statuses)
-
-                # Use eventlet-friendly sleep
-                if self.socketio:
-                    self.socketio.sleep(self.ui_update_interval)
-                else:
-                    time.sleep(self.ui_update_interval)
-
-            except Exception as e:
-                logger.error(f"Error in sensor monitoring loop: {e}")
-                time.sleep(self.ui_update_interval) # prevent rapid-fire errors
 
     def start_monitoring(self):
-        """Start the main sensor monitoring loop in a background thread."""
+        """Start all monitoring threads."""
         if self.running:
             logger.warning("Monitoring is already running.")
             return
             
         self.running = True
+
+        # Map sensors to the keys they update in last_readings
+        sensor_key_map = {
+            'dht': ['temperature', 'humidity'],
+            'soil_moisture': 'soil_moisture',
+            'pressure': 'pressure',
+            'light': 'light',
+            'rain': 'rain'
+        }
+
+        # Start a thread for each active sensor
+        for name, instance in self.sensors.items():
+            if instance:
+                keys = sensor_key_map[name]
+                thread = threading.Thread(target=self._read_sensor_loop, args=(name, instance, keys))
+                thread.daemon = True
+                thread.start()
+                self.sensor_threads.append(thread)
         
-        # Get UI update interval from app config
-        if self.app:
-            with self.app.app_context():
-                self.ui_update_interval = current_app.config.get('UI_UPDATE_INTERVAL', 2)
-        
-        # Use eventlet.spawn if socketio is available for green threads
+        # Start the UI broadcasting loop
         if self.socketio:
-            self.socketio.start_background_task(self._monitoring_loop)
-        else:
-            # Fallback to standard threading if socketio is not used
-            self.monitor_thread = threading.Thread(target=self._monitoring_loop)
-            self.monitor_thread.daemon = True
-            self.monitor_thread.start()
+            self.socketio.start_background_task(self._broadcast_loop)
+        
+        # Start CSV logging loop
+        if self.csv_logging_enabled:
+            self.logging_thread = self.socketio.start_background_task(self._csv_logging_loop)
+
+        logger.info("All sensor monitoring threads started.")
 
     def stop_monitoring(self):
-        """Stop the monitoring loop."""
-        self.running = False
-        if self.logging_thread and self.logging_thread.is_alive():
-            self.logging_thread.join()  # Wait for the thread to finish
-        logger.info("Sensor monitoring stopped")
+        """Stop all monitoring threads."""
+        if self.running:
+            self.running = False
+            # Threads are daemons, so they will exit automatically.
+            # No need to join them, which can cause blocking issues.
+            logger.info("Stopped all monitoring threads.")

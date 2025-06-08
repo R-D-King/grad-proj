@@ -22,6 +22,7 @@ import os
 UI_UPDATE_INTERVAL = int(os.environ.get('UI_UPDATE_INTERVAL', 2))  # 2 seconds default
 DB_UPDATE_INTERVAL = int(os.environ.get('DB_UPDATE_INTERVAL', 60))  # 60 seconds default
 
+# Initialize a single sensor controller instance
 sensor_controller = SensorController()
 
 # LCD display instance - will be initialized in init_app
@@ -30,13 +31,20 @@ lcd_thread = None
 lcd_running = False
 
 def init_app(app):
-    """Initialize the weather controller with the Flask app context."""
+    """
+    Initializes the weather controller with the Flask app context.
+    Sets up the socket.io instance and starts monitoring.
+    """
     global lcd, lcd_thread, lcd_running
     
-    sensor_controller.set_app(app)
-    sensor_controller.set_socketio(socketio)
-    
     try:
+        # Pass the app and socketio instances to the sensor controller
+        sensor_controller.set_app(app)
+        sensor_controller.set_socketio(socketio)
+        
+        # Start all monitoring threads (sensor reading, UI broadcasting, CSV logging)
+        sensor_controller.start_monitoring()
+        
         config = app.config.get_namespace('')
         lcd_config = config.get('hardware', {}).get('sensors', {}).get('pins', {}).get('lcd', {})
         lcd = LCD(
@@ -62,19 +70,8 @@ def init_app(app):
         lcd_thread.start()
         logger.info("LCD display initialized and update thread started")
     except Exception as e:
-        logger.error(f"Failed to initialize LCD display: {e}")
+        logger.error(f"Failed to initialize weather controller: {e}")
         lcd = None
-
-    # Start the monitoring thread for UI sensor data
-    update_thread = socketio.start_background_task(target=emit_sensor_updates, app=app)
-    setattr(update_thread, "do_run", True)
-
-    # Start the monitoring thread for sensor connection status
-    status_thread = socketio.start_background_task(target=emit_sensor_status, app=app)
-    setattr(status_thread, "do_run", True)
-
-    # Start the CSV logging thread
-    sensor_controller.start_csv_logging()
 
     logger.info("Weather controller initialized and monitoring started.")
     return sensor_controller
@@ -165,8 +162,11 @@ def lcd_update_loop(app):
             logger.error(f"Error in LCD update loop: {e}")
             time.sleep(1)
 
-def get_latest_weather_data():
-    """Get the latest weather data from the controller."""
+def get_current_weather_data():
+    """
+    Returns the latest readings from the sensor controller.
+    This function is used by other parts of the application to get data.
+    """
     return sensor_controller.get_latest_readings()
 
 def update_weather_data(data):
@@ -208,20 +208,6 @@ def display_shutdown():
         except Exception:
             pass
 
-def emit_sensor_updates(app):
-    """Continuously emit sensor data updates to clients."""
-    ui_update_interval = app.config.get('UI_UPDATE_INTERVAL', 2)
-    while getattr(threading.current_thread(), "do_run", True):
-        with app.app_context():
-            sensor_data = sensor_controller.get_latest_readings()
-            socketio.emit('sensor_update', sensor_data)
-        socketio.sleep(ui_update_interval)
-
-def emit_sensor_status(app):
-    """Periodically emit the connection status of sensors."""
-    status_update_interval = app.config.get('SENSOR_STATUS_INTERVAL', 5) # 5 seconds
-    while getattr(threading.current_thread(), "do_run", True):
-        with app.app_context():
-            statuses = sensor_controller.get_sensor_statuses()
-            socketio.emit('sensor_status_update', statuses)
-        socketio.sleep(status_update_interval)
+def get_latest_weather_data():
+    """Get the latest weather data from the controller."""
+    return sensor_controller.get_latest_readings()

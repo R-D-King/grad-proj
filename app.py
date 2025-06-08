@@ -28,7 +28,7 @@ from weather.models import WeatherData
 from irrigation.models import Preset, PumpLog, IrrigationLog
 
 # Set default configuration values for key operational parameters
-os.environ.setdefault('UI_UPDATE_INTERVAL', '2')  # 2 second default
+os.environ.setdefault('UI_UPDATE_INTERVAL', '0.5')  # Broadcast UI updates every 500ms
 os.environ.setdefault('DB_UPDATE_INTERVAL', '60')  # 60 seconds default
 os.environ.setdefault('NETWORK_UPDATE_INTERVAL', '60') # 60 seconds default
 
@@ -159,7 +159,6 @@ def create_app(config_class=Config):
             # Stop all monitoring threads first
             if hasattr(sensor_controller, 'running'):
                 sensor_controller.running = False
-                eventlet.sleep(0.5)  # Brief pause to let threads notice the change
         except Exception as e:
             logging.error(f"Error stopping sensor controller: {e}")
         
