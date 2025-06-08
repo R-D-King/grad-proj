@@ -47,8 +47,8 @@ def get_network_ssid():
             result = subprocess.check_output(['iwgetid', '-r']).decode('utf-8').strip()
             return result if result else "Not connected"
         else:
-            # For Windows (simulation mode)
-            return "Simulation SSID"
+            # For other OS (e.g., development)
+            return "Dev-SSID"  # Placeholder for development
     except Exception as e:
         print(f"Error getting network SSID: {e}")
         return "Unknown"

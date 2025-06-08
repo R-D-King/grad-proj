@@ -107,39 +107,24 @@ signal.signal(signal.SIGINT, signal_handler)
 class BMP180Sensor:
     """BMP180 pressure, temperature and altitude sensor interface."""
     
-    def __init__(self, i2c_address=DEVICE, i2c_bus=1, simulation=False):
+    def __init__(self, i2c_address=DEVICE, i2c_bus=1):
         """Initialize the BMP180 sensor."""
         self.i2c_address = i2c_address
         self.i2c_bus = i2c_bus
-        self.simulation = simulation
         
-        if not simulation:
-            try:
-                # Try to initialize the I2C bus
-                global bus
-                bus = smbus.SMBus(i2c_bus)
-            except (ImportError, IOError):
-                self.simulation = True
+        try:
+            # Try to initialize the I2C bus
+            global bus
+            bus = smbus.SMBus(i2c_bus)
+        except (ImportError, IOError):
+            pass
     
     def read(self):
         """Read sensor data and return temperature, pressure, and altitude."""
-        if self.simulation:
-            # Return simulated values
-            import random
-            temperature = round(random.uniform(18.0, 25.0), 1)
-            pressure = round(random.uniform(980.0, 1050.0), 1)
-            altitude = round(random.uniform(0.0, 100.0), 2)
-            return (temperature, pressure, altitude)
-        
         try:
             return readBmp180(self.i2c_address)
         except Exception:
-            # Return simulated values on error
-            import random
-            temperature = round(random.uniform(18.0, 25.0), 1)
-            pressure = round(random.uniform(980.0, 1050.0), 1)
-            altitude = round(random.uniform(0.0, 100.0), 2)
-            return (temperature, pressure, altitude)
+            return (None, None, None)
     
     def get_temperature(self):
         """Get the current temperature in °C."""

@@ -1,6 +1,5 @@
 import spidev
 import time
-import random
 
 # MCP3008 SPI Configuration
 spi = spidev.SpiDev()
@@ -31,28 +30,22 @@ def calculate_wetness_percentage(value):
 class RainSensor:
     """Rain sensor interface with analog output."""
     
-    def __init__(self, channel=RAIN_CHANNEL, dry_value=DRY_VALUE, wet_value=WET_VALUE, simulation=False):
+    def __init__(self, channel=RAIN_CHANNEL, dry_value=DRY_VALUE, wet_value=WET_VALUE):
         """Initialize the rain sensor."""
         self.channel = channel
         self.dry_value = dry_value
         self.wet_value = wet_value
-        self.simulation = simulation
         self.spi = None
         
-        if not simulation:
-            try:
-                self.spi = spidev.SpiDev()
-                self.spi.open(0, 0)  # Open SPI bus 0, device 0
-                self.spi.max_speed_hz = 1000000  # Set SPI speed to 1MHz
-            except (ImportError, IOError):
-                self.simulation = True
+        try:
+            self.spi = spidev.SpiDev()
+            self.spi.open(0, 0)  # Open SPI bus 0, device 0
+            self.spi.max_speed_hz = 1000000  # Set SPI speed to 1MHz
+        except (ImportError, IOError):
+            pass
     
     def read_channel(self):
         """Read raw analog data from MCP3008 ADC."""
-        if self.simulation:
-            # Return a simulated value
-            return int(random.uniform(self.wet_value, self.dry_value))
-        
         try:
             if self.spi:
                 adc = self.spi.xfer2([1, (8 + self.channel) << 4, 0])
@@ -62,12 +55,13 @@ class RainSensor:
                 # Use global SPI if instance SPI is not available
                 return read_channel(self.channel)
         except Exception:
-            # Return a simulated value on error
-            return int(random.uniform(self.wet_value, self.dry_value))
+            return None
     
     def get_rain_percentage(self):
         """Get the current rain/wetness level as a percentage."""
         raw_value = self.read_channel()
+        if raw_value is None:
+            return None
         
         # Clamp value to calibration range
         raw_value = max(min(raw_value, self.dry_value), self.wet_value)
@@ -82,6 +76,8 @@ class RainSensor:
     def get_status(self):
         """Get the current rain status as a string."""
         wetness = self.get_rain_percentage()
+        if wetness is None:
+            return "UNKNOWN"
         
         if wetness < 10:
             return "DRY - No rain detected"
@@ -92,7 +88,7 @@ class RainSensor:
     
     def close(self):
         """Close the SPI connection."""
-        if not self.simulation and self.spi:
+        if self.spi:
             self.spi.close()
 
 # Only run the test code when this file is executed directly, not when imported

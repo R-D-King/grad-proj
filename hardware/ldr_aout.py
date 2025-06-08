@@ -1,6 +1,5 @@
 import spidev
 import time
-import random
 
 # MCP3008 SPI Configuration
 spi = spidev.SpiDev()
@@ -38,28 +37,22 @@ LDR_MAX = 1023   # ADC value in bright light (3.3V) - 10-bit ADC has max value o
 class LDRSensor:
     """Light Dependent Resistor (LDR) sensor interface."""
     
-    def __init__(self, channel=LDR_CHANNEL, min_value=LDR_MIN, max_value=LDR_MAX, simulation=False):
+    def __init__(self, channel=LDR_CHANNEL, min_value=LDR_MIN, max_value=LDR_MAX):
         """Initialize the LDR sensor."""
         self.channel = channel
         self.min_value = min_value
         self.max_value = max_value
-        self.simulation = simulation
         self.spi = None
         
-        if not simulation:
-            try:
-                self.spi = spidev.SpiDev()
-                self.spi.open(0, 0)  # Open SPI bus 0, device 0
-                self.spi.max_speed_hz = 1000000  # Set SPI speed to 1MHz
-            except (ImportError, IOError):
-                self.simulation = True
+        try:
+            self.spi = spidev.SpiDev()
+            self.spi.open(0, 0)  # Open SPI bus 0, device 0
+            self.spi.max_speed_hz = 1000000  # Set SPI speed to 1MHz
+        except (ImportError, IOError):
+            pass
     
     def read_channel(self):
         """Read raw analog data from MCP3008 ADC."""
-        if self.simulation:
-            # Return a simulated value
-            return int(random.uniform(self.min_value, self.max_value))
-        
         try:
             if self.spi:
                 adc = self.spi.xfer2([1, (8 + self.channel) << 4, 0])
@@ -69,12 +62,13 @@ class LDRSensor:
                 # Use global SPI if instance SPI is not available
                 return read_channel(self.channel)
         except Exception:
-            # Return a simulated value on error
-            return int(random.uniform(self.min_value, self.max_value))
+            return None
     
     def get_light_percentage(self):
         """Get the current light level as a percentage."""
         raw_value = self.read_channel()
+        if raw_value is None:
+            return None
         
         # Convert raw value to light percentage
         return convert_to_percent(raw_value, self.min_value, self.max_value)
@@ -85,7 +79,7 @@ class LDRSensor:
     
     def close(self):
         """Close the SPI connection."""
-        if not self.simulation and self.spi:
+        if self.spi:
             self.spi.close()
 
 # Only run the test code when this file is executed directly, not when imported

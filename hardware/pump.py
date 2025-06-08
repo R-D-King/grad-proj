@@ -17,17 +17,16 @@ class Pump:
     as well as run it for a specific duration.
     """
     
-    def __init__(self, relay_pin=17, name="Water Pump", simulation=True):
+    def __init__(self, relay_pin=17, name="Water Pump"):
         """
         Initialize the pump controller.
         
         Args:
             relay_pin (int): GPIO pin number connected to the relay
             name (str): Name of the pump for logging
-            simulation (bool): True to run in simulation mode
         """
         self.name = name
-        self.relay = Relay(pin=relay_pin, name=f"{name} Relay", simulation=simulation)
+        self.relay = Relay(pin=relay_pin, name=f"{name} Relay")
         self.running = False
         self.start_time = None
         logger.info(f"Initialized {name} controller using relay on pin {relay_pin}")

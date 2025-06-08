@@ -36,7 +36,6 @@ class Config:
         "sensors": {
             "ui_update_interval": 1,
             "db_update_interval": 60,
-            "simulation": False,
             "pins": {
                 "dht22": 26,
                 "soil_moisture": {
@@ -75,7 +74,6 @@ class Config:
     ENV_MAPPINGS = {
         "UI_UPDATE_INTERVAL": "hardware.sensors.ui_update_interval",
         "DB_UPDATE_INTERVAL": "hardware.sensors.db_update_interval",
-        "SENSOR_SIMULATION": "hardware.sensors.simulation",
         "PORT": "server.port",
         "DEBUG": "server.debug",
         "DATA_RETENTION_DAYS": "database.retention.max_days",

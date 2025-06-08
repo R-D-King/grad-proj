@@ -1,34 +1,28 @@
 import spidev  # Installation: See README.md for proper installation instructions
 import time
-import random
 
 class SoilMoistureSensor:
     """Soil moisture sensor interface with analog output."""
     
-    def __init__(self, channel=0, dry_value=900, wet_value=400, simulation=False):
+    def __init__(self, channel=0, dry_value=900, wet_value=400):
         """Initialize the soil moisture sensor.
         
         Args:
             channel: ADC channel for the sensor (default: 0)
             dry_value: ADC value when sensor is completely dry (default: 900)
             wet_value: ADC value when sensor is in water (default: 400)
-            simulation: Whether to simulate readings
         """
         self.channel = channel
         self.dry_value = dry_value
         self.wet_value = wet_value
-        self.simulation = simulation
         self.spi = None
         
-        if not simulation:
-            try:
-                self.spi = spidev.SpiDev()
-                self.spi.open(0, 0)  # Open SPI bus 0, device 0
-                self.spi.max_speed_hz = 1000000  # Set SPI speed to 1MHz
-            except (ImportError, IOError) as e:
-                print(f"Error initializing SPI for soil moisture sensor: {e}")
-                self.simulation = True
-                print("Using simulation mode for soil moisture sensor")
+        try:
+            self.spi = spidev.SpiDev()
+            self.spi.open(0, 0)  # Open SPI bus 0, device 0
+            self.spi.max_speed_hz = 1000000  # Set SPI speed to 1MHz
+        except (ImportError, IOError) as e:
+            print(f"Error initializing SPI for soil moisture sensor: {e}")
     
     def read(self):
         """Get the current moisture level as a percentage."""
@@ -36,10 +30,6 @@ class SoilMoistureSensor:
     
     def read_channel(self):
         """Read raw analog data from MCP3008 ADC."""
-        if self.simulation:
-            # Return a simulated value
-            return int(random.uniform(self.wet_value, self.dry_value))
-        
         try:
             # Add timeout to prevent hanging
             max_attempts = 3
@@ -56,12 +46,13 @@ class SoilMoistureSensor:
                         raise
         except Exception as e:
             print(f"Error reading soil moisture sensor after {max_attempts} attempts: {e}")
-            # Return a simulated value on error
-            return int(random.uniform(self.wet_value, self.dry_value))
+            return None
     
     def get_moisture_percentage(self):
         """Get the current moisture level as a percentage."""
         raw_value = self.read_channel()
+        if raw_value is None:
+            return None
         
         # Clamp value to calibration range
         raw_value = max(min(raw_value, self.dry_value), self.wet_value)
@@ -74,7 +65,7 @@ class SoilMoistureSensor:
     
     def close(self):
         """Close the SPI connection."""
-        if not self.simulation and self.spi:
+        if self.spi:
             self.spi.close()
 
 # MCP3008 SPI Configuration - for backwards compatibility with existing code

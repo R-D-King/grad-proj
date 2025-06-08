@@ -9,7 +9,6 @@ from datetime import datetime
 from flask import current_app
 import os
 import csv
-import random
 import json
 
 # Set up logging
@@ -18,13 +17,9 @@ logger = logging.getLogger(__name__)
 class SensorController:
     """Controller for managing all sensors in the system."""
     
-    def __init__(self, simulation=False):
+    def __init__(self):
         """Initialize the sensor controller.
-        
-        Args:
-            simulation (bool): Whether to use simulated sensors
         """
-        self.simulation = simulation
         self.sensors = {}
         self.last_readings = {}
         self.running = False  # Initialize the running attribute
@@ -49,55 +44,46 @@ class SensorController:
         self.validation_limits = {}
         self.logging_thread = None
         
-        # Initialize sensors based on simulation mode
         self._initialize_sensors()
     
     def _initialize_sensors(self):
         """Initialize all sensors based on simulation mode."""
         try:
-            if self.simulation:
-                from .sensor_simulation import SimulatedSensor
-                self.sensors['dht'] = SimulatedSensor('dht', min_value=0, max_value=40, default_value=22)
-                self.sensors['soil_moisture'] = SimulatedSensor('soil_moisture', min_value=0, max_value=100, default_value=50)
-                self.sensors['pressure'] = SimulatedSensor('pressure', min_value=980, max_value=1050, default_value=1013)
-                self.sensors['light'] = SimulatedSensor('light', min_value=0, max_value=100, default_value=60)
-                self.sensors['rain'] = SimulatedSensor('rain', min_value=0, max_value=100, default_value=10)
-            else:
-                # Initialize hardware sensors
-                try:
-                    from .dht22 import DHT22Sensor
-                    self.sensors['dht'] = DHT22Sensor(pin=26)
-                except Exception as e:
-                    print(f"Error initializing DHT22 sensor: {e}")
-                    self.sensors['dht'] = None
-                
-                try:
-                    from .soil_moisture import SoilMoistureSensor
-                    self.sensors['soil_moisture'] = SoilMoistureSensor()
-                except Exception as e:
-                    print(f"Error initializing soil moisture sensor: {e}")
-                    self.sensors['soil_moisture'] = None
-                
-                try:
-                    from .bmp180 import BMP180Sensor
-                    self.sensors['pressure'] = BMP180Sensor()
-                except Exception as e:
-                    print(f"Error initializing BMP180 sensor: {e}")
-                    self.sensors['pressure'] = None
-                
-                try:
-                    from .ldr_aout import LDRSensor
-                    self.sensors['light'] = LDRSensor()
-                except Exception as e:
-                    print(f"Error initializing LDR sensor: {e}")
-                    self.sensors['light'] = None
-                
-                try:
-                    from .rain_aout import RainSensor
-                    self.sensors['rain'] = RainSensor()
-                except Exception as e:
-                    print(f"Error initializing rain sensor: {e}")
-                    self.sensors['rain'] = None
+            # Initialize hardware sensors
+            try:
+                from .dht22 import DHT22Sensor
+                self.sensors['dht'] = DHT22Sensor(pin=26)
+            except Exception as e:
+                print(f"Error initializing DHT22 sensor: {e}")
+                self.sensors['dht'] = None
+            
+            try:
+                from .soil_moisture import SoilMoistureSensor
+                self.sensors['soil_moisture'] = SoilMoistureSensor()
+            except Exception as e:
+                print(f"Error initializing soil moisture sensor: {e}")
+                self.sensors['soil_moisture'] = None
+            
+            try:
+                from .bmp180 import BMP180Sensor
+                self.sensors['pressure'] = BMP180Sensor()
+            except Exception as e:
+                print(f"Error initializing BMP180 sensor: {e}")
+                self.sensors['pressure'] = None
+            
+            try:
+                from .ldr_aout import LDRSensor
+                self.sensors['light'] = LDRSensor()
+            except Exception as e:
+                print(f"Error initializing LDR sensor: {e}")
+                self.sensors['light'] = None
+            
+            try:
+                from .rain_aout import RainSensor
+                self.sensors['rain'] = RainSensor()
+            except Exception as e:
+                print(f"Error initializing rain sensor: {e}")
+                self.sensors['rain'] = None
         except Exception as e:
             print(f"Error initializing sensors: {e}")
     
@@ -124,9 +110,6 @@ class SensorController:
         except Exception as e:
             logger.error(f"Error reading DHT sensor: {e}")
             readings.update({'temperature': None, 'humidity': None})
-            if self.simulation:
-                readings['temperature'] = round(random.uniform(18.0, 25.0), 1)
-                readings['humidity'] = round(random.uniform(40.0, 60.0), 1)
 
         # Soil Moisture
         try:
@@ -140,8 +123,6 @@ class SensorController:
         except Exception as e:
             logger.error(f"Error reading soil moisture sensor: {e}")
             readings['soil_moisture'] = None
-            if self.simulation:
-                readings['soil_moisture'] = round(random.uniform(30.0, 70.0), 2)
 
         # Pressure
         try:
@@ -158,8 +139,6 @@ class SensorController:
         except Exception as e:
             logger.error(f"Error reading pressure sensor: {e}")
             readings['pressure'] = None
-            if self.simulation:
-                readings['pressure'] = random.uniform(980, 1050)
 
         # Light
         try:
@@ -175,8 +154,6 @@ class SensorController:
         except Exception as e:
             logger.error(f"Error reading light sensor: {e}")
             readings['light'] = None
-            if self.simulation:
-                readings['light'] = random.uniform(0, 100)
 
         # Rain
         try:
@@ -192,8 +169,6 @@ class SensorController:
         except Exception as e:
             logger.error(f"Error reading rain sensor: {e}")
             readings['rain'] = None
-            if self.simulation:
-                readings['rain'] = random.uniform(0, 100)
         
         self.last_readings = readings
         return readings
@@ -217,7 +192,7 @@ class SensorController:
             try:
                 dht_pin = app.config.get('hardware', {}).get('sensors', {}).get('pins', {}).get('dht22', 26)
                 
-                if dht_pin != self.dht_pin and not self.simulation and platform.system() == "Linux":
+                if dht_pin != self.dht_pin and platform.system() == "Linux":
                     logger.info(f"Updating DHT pin from {self.dht_pin} to {dht_pin}")
                     self.dht_pin = dht_pin
                     
@@ -373,14 +348,9 @@ class SensorController:
         if not self.sensors:
             return {}
 
-        try:
-            from .sensor_simulation import SimulatedSensor
-            for name, sensor_obj in self.sensors.items():
-                is_simulated = isinstance(sensor_obj, SimulatedSensor) or sensor_obj is None
-                status[f'{name}_simulated'] = is_simulated
-        except ImportError:
-             for name in self.sensors:
-                status[f'{name}_simulated'] = self.simulation
+        for name, sensor_obj in self.sensors.items():
+            is_simulated = sensor_obj is None
+            status[f'{name}_simulated'] = is_simulated
 
         return status
     

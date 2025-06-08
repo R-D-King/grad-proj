@@ -1,44 +1,32 @@
 import time
-import random
 import board
 import adafruit_dht
 
 class DHT22Sensor:
     """DHT22 temperature and humidity sensor interface."""
     
-    def __init__(self, pin=26, simulation=False, max_retries=3):
+    def __init__(self, pin=26, max_retries=3):
         """Initialize the DHT22 sensor.
         
         Args:
             pin: GPIO pin number (default: 26)
-            simulation: Whether to simulate readings
             max_retries: Maximum number of retries for failed readings
         """
         self.pin = pin
-        self.simulation = simulation
         self.max_retries = max_retries
         self.dht_device = None
         
-        if not simulation:
-            try:
-                # Use the board module to get the correct pin
-                dht_pin = getattr(board, f"D{pin}")
-                self.dht_device = adafruit_dht.DHT22(dht_pin, use_pulseio=False)
-                # Test reading to verify connection
-                self.read()
-            except (ImportError, ValueError, RuntimeError) as e:
-                print(f"Error initializing DHT22 sensor: {e}")
-                self.simulation = True
-                print("Using simulation mode for DHT22 sensor")
+        try:
+            # Use the board module to get the correct pin
+            dht_pin = getattr(board, f"D{pin}")
+            self.dht_device = adafruit_dht.DHT22(dht_pin, use_pulseio=False)
+            # Test reading to verify connection
+            self.read()
+        except (ImportError, ValueError, RuntimeError) as e:
+            print(f"Error initializing DHT22 sensor: {e}")
     
     def read(self):
         """Read temperature and humidity from the sensor."""
-        if self.simulation:
-            # Return simulated values
-            temperature = round(random.uniform(18.0, 28.0), 1)
-            humidity = round(random.uniform(30.0, 70.0), 1)
-            return {'temperature': temperature, 'humidity': humidity}
-        
         # Try to read with retries
         for attempt in range(self.max_retries):
             try:
@@ -65,7 +53,7 @@ class DHT22Sensor:
     
     def cleanup(self):
         """Clean up resources."""
-        if not self.simulation and self.dht_device:
+        if self.dht_device:
             try:
                 self.dht_device.exit()
                 print("DHT22 sensor resources released")

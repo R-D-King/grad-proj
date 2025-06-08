@@ -14,8 +14,6 @@ import subprocess
 # Set up logging
 logger = logging.getLogger(__name__)
 
-# Initialize the sensor controller with simulation mode based on environment
-# This will be set to False on Raspberry Pi
 import platform
 import os
 
@@ -23,10 +21,7 @@ import os
 UI_UPDATE_INTERVAL = int(os.environ.get('UI_UPDATE_INTERVAL', 1))  # 1 second default
 DB_UPDATE_INTERVAL = int(os.environ.get('DB_UPDATE_INTERVAL', 60))  # 60 seconds default
 
-simulation_mode = platform.system() != "Linux"
-sensor_controller = SensorController(
-    simulation=simulation_mode
-)
+sensor_controller = SensorController()
 
 # LCD display instance - will be initialized in init_app
 lcd = None
@@ -58,7 +53,6 @@ def init_app(app):
         pin_rs = lcd_config.get('pin_rs', 25)
         pin_e = lcd_config.get('pin_e', 24)
         pins_data = lcd_config.get('pins_data', [23, 17, 18, 22])
-        simulation = simulation_mode
         
         # Initialize LCD
         lcd = LCD(
@@ -66,11 +60,11 @@ def init_app(app):
             rows=rows, 
             pin_rs=pin_rs, 
             pin_e=pin_e, 
-            pins_data=pins_data, 
-            simulation=simulation
+            pins_data=pins_data
         )
         
         # Display network name, IP and port on LCD
+        from app import get_network_ssid
         network_ssid = get_network_ssid()
         ip_address = app.config.get('IP_ADDRESS', '127.0.0.1')
         port = app.config.get('PORT', 5000)
@@ -96,7 +90,7 @@ def get_pressure_display():
     
     try:
         # Create a BMP180 sensor instance
-        bmp_sensor = BMP180Sensor(simulation=simulation_mode)
+        bmp_sensor = BMP180Sensor()
         
         # Get the pressure reading
         _, pressure, _ = bmp_sensor.read()
@@ -115,7 +109,7 @@ def get_light_display():
     
     try:
         # Create an LDR sensor instance
-        ldr_sensor = LDRSensor(simulation=simulation_mode)
+        ldr_sensor = LDRSensor()
         
         # Get the light percentage
         light = ldr_sensor.get_light_percentage()
@@ -134,7 +128,7 @@ def get_rain_display():
     
     try:
         # Create a Rain sensor instance
-        rain_sensor = RainSensor(simulation=simulation_mode)
+        rain_sensor = RainSensor()
         
         # Get the rain percentage
         rain = rain_sensor.get_rain_percentage()
@@ -155,6 +149,7 @@ def lcd_update_loop(app):
     time.sleep(5)
     
     # Define display modes and their data
+    from app import get_network_ssid
     display_modes = [
         # Mode 0: Network Name (SSID)
         lambda: (f"Network:", 
@@ -222,32 +217,32 @@ def get_latest_weather_data():
     }
 
 def update_weather_data(data=None):
-    """Update weather data with new readings (API endpoint)."""
-    if data is None:
-        # If no data provided, get from sensors
-        sensor_data = sensor_controller.get_latest_readings()
-        data = {
-            'temperature': sensor_data.get('temperature', 0),
-            'humidity': sensor_data.get('humidity', 0),
-            'soil_moisture': sensor_data.get('soil_moisture', 0),
-            'pressure': 0     # We don't have a pressure sensor
-        }
+    """Update weather data in the database with current sensor readings."""
+    if data:
+        # Use provided data if available
+        new_data = WeatherData(
+            temperature=data.get('temperature', 0),
+            humidity=data.get('humidity', 0),
+            soil_moisture=data.get('soil_moisture', 0),
+            pressure=data.get('pressure', 0),
+            light=data.get('light', 0),
+            rain=data.get('rain', 0)
+        )
+    else:
+        # Otherwise, fetch new readings
+        readings = sensor_controller.update_readings()
+        new_data = WeatherData(
+            temperature=readings.get('temperature', 0),
+            humidity=readings.get('humidity', 0),
+            soil_moisture=readings.get('soil_moisture', 0),
+            pressure=readings.get('pressure', 0),
+            light=readings.get('light', 0),
+            rain=readings.get('rain', 0)
+        )
     
-    # Create new weather data entry
-    weather_data = WeatherData(
-        temperature=data.get('temperature', 0),
-        humidity=data.get('humidity', 0),
-        soil_moisture=data.get('soil_moisture', 0),
-        pressure=data.get('pressure', 0)
-    )
-    db.session.add(weather_data)
+    db.session.add(new_data)
     db.session.commit()
-    
-    # Emit the new data to connected clients
-    socketio.emit('weather_update', weather_data.to_dict())
-    
-    return weather_data.to_dict()
-
+    logger.info("Weather data updated in the database")
 
 def get_network_ssid():
     """Get the SSID of the connected WiFi network."""
@@ -257,12 +252,11 @@ def get_network_ssid():
             result = subprocess.check_output(['iwgetid', '-r']).decode('utf-8').strip()
             return result if result else "Not connected"
         else:
-            # For Windows (simulation mode)
-            return "Simulation SSID"
+            # For other OS (e.g., development)
+            return "Dev-SSID"  # Placeholder for development
     except Exception as e:
         logger.error(f"Error getting network SSID: {e}")
         return "Unknown"
-
 
 def display_shutdown():
     """Display shutdown message on the LCD."""

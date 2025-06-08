@@ -13,8 +13,8 @@ from .models import Preset, PumpLog, IrrigationLog
 logger = logging.getLogger(__name__)
 
 # Initialize hardware
-pump = Relay(pin=17, name="Water Pump", simulation=True)
-water_level_sensor = WaterLevelSensor(simulation=True)
+pump = Relay(pin=17, name="Water Pump")
+water_level_sensor = WaterLevelSensor()
 
 # Global variables for pump state
 pump_running = False

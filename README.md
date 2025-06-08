@@ -15,7 +15,6 @@ A web-based irrigation system with weather monitoring capabilities.
 - Light level monitoring with LDR sensor
 - Rain detection with rain sensor
 - Pressure and altitude monitoring with BMP180 sensor
-- Sensor simulation mode for development and testing
 
 ## Setup
 
@@ -89,7 +88,6 @@ A web-based irrigation system with weather monitoring capabilities.
   - `rain_aout.py` - Rain sensor interface
   - `lcd_16x2.py` - 16x2 LCD display interface
   - `sensor_controller.py` - Unified sensor management
-  - `sensor_simulation.py` - Sensor simulation for development
 - `instance/` - Instance-specific files (database)
 - `venv/` - Virtual environment (created by setup.py)
 
@@ -149,15 +147,6 @@ The application uses WebSockets for real-time updates:
 - `pump_status_change` - Sent when the pump status changes
 - `sensor_update` - Sent when new sensor readings are available
 
-## Sensor Simulation
-
-The application includes a simulation mode for development and testing without physical hardware:
-
-- Enable simulation mode by setting the environment variable: `SENSOR_SIMULATION=true`
-- All sensors will generate realistic simulated values
-- Simulated values will vary slightly over time to mimic real sensor behavior
-- The LCD display will show simulated output in the console
-
 ## Resolved Issues
 
 The following issues have been fixed:
@@ -182,10 +171,6 @@ The following issues have been fixed:
    - ✅ Fixed water level display showing duplicate percentage signs
    - ✅ Running time counter now displays integer values without decimal places
 
-6. Sensor Simulation:
-   - ✅ Added missing sensor simulation module
-   - ✅ Fixed import error for SimulatedSensor class
-
 ## Known Issues
 
 The following issues are currently being addressed:
@@ -194,27 +179,23 @@ The following issues are currently being addressed:
    - Cannot create or load irrigation presets
    - No way to select and activate a preset while deactivating others
 
-## Potential Issues
-
-These are additional concerns that may need attention:
-
-1. Timer Functionality:
+2. Timer Functionality:
    - Running time counter may reset unexpectedly when browser refreshes
    - No persistent storage of pump running time across server restarts
 
-2. Error Handling:
+3. Error Handling:
    - Insufficient error handling for API requests
    - No user feedback when server connections fail
 
-3. UI/UX Issues:
+4. UI/UX Issues:
    - Inconsistent responsive design on smaller screens
    - Limited accessibility features
 
-4. Database Management:
+5. Database Management:
    - No data pruning mechanism for old logs
    - Potential performance issues with large datasets
 
-5. Security Concerns:
+6. Security Concerns:
    - No authentication system for controlling pump
    - API endpoints lack proper validation
 
@@ -278,7 +259,6 @@ The following environment variables can be used to override configuration settin
 
 - `UI_UPDATE_INTERVAL`: How often sensor readings are sent to the UI (in seconds, default: 1)
 - `DB_UPDATE_INTERVAL`: How often sensor readings are stored in the database (in seconds, default: 60)
-- `SENSOR_SIMULATION`: Whether to use simulated sensors instead of hardware (true/false, default: false)
 - `PORT`: The port to run the server on (default: 5000)
 - `DEBUG`: Whether to run the server in debug mode (true/false, default: false)
 - `DATA_RETENTION_DAYS`: How many days of data to keep before pruning (default: 30)
@@ -288,7 +268,6 @@ Example of setting configuration on Windows:
 ```cmd
 set UI_UPDATE_INTERVAL=2
 set DB_UPDATE_INTERVAL=120
-set SENSOR_SIMULATION=true
 
 python app.py
 ```

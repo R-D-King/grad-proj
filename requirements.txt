@@ -14,8 +14,5 @@ python-dateutil==2.8.2
 pytest==7.4.0
 pytest-flask==1.2.0
 
-# For simulation mode
-numpy==1.25.2
 requests==2.31.0
-# For sensor simulation
-numpy==1.24.3
+numpy==1.25.2
