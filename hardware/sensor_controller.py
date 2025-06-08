@@ -155,20 +155,37 @@ class SensorController:
         return csv_file, csv_writer
 
     def _log_data_to_csv(self):
-        """Logs the latest data to the CSV file."""
-        if not self.csv_logging_enabled: return
+        """Rounds sensor data, writes it to CSV, and logs it to the terminal."""
+        if not self.csv_logging_enabled:
+            return
 
         try:
+            readings = self.get_latest_readings()
+            
+            # Data for logging to terminal
+            log_payload = {'timestamp': readings.get('timestamp')}
+            # Data for writing to CSV
+            csv_row = [readings.get('timestamp')]
+
+            # Process each sensor reading
+            for key in ['temperature', 'humidity', 'soil_moisture', 'pressure', 'light', 'rain']:
+                value = readings.get(key)
+                if isinstance(value, (int, float)):
+                    rounded_value = round(value, 2)
+                    log_payload[key] = rounded_value
+                    csv_row.append(rounded_value)
+                else:
+                    log_payload[key] = None
+                    csv_row.append('') # Write empty string for None values in CSV
+
+            # Write to CSV file
             csv_file, csv_writer = self._setup_csv_file()
             with csv_file:
-                readings = self.get_latest_readings()
-                row_data = [
-                    readings['timestamp'],
-                    readings.get('temperature'), readings.get('humidity'),
-                    readings.get('soil_moisture'), readings.get('pressure'),
-                    readings.get('light'), readings.get('rain')
-                ]
-                csv_writer.writerow(row_data)
+                csv_writer.writerow(csv_row)
+            
+            # Log to terminal after successful write
+            logger.info(f"Logged to CSV: {log_payload}")
+
         except Exception as e:
             logger.error(f"Failed to write to CSV: {e}")
 
