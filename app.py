@@ -22,6 +22,10 @@ from reports.routes import reports_bp
 import json
 import logging
 
+# Import all models to ensure they are registered with SQLAlchemy
+from weather.models import WeatherData
+from irrigation.models import Preset, PumpLog, IrrigationLog
+
 # Set default configuration values for key operational parameters
 os.environ.setdefault('UI_UPDATE_INTERVAL', '1')  # 1 second default
 os.environ.setdefault('DB_UPDATE_INTERVAL', '60')  # 60 seconds default
