@@ -139,6 +139,15 @@ def activate_preset(preset_id):
     logger.info(f"Activated preset: {target_preset.name}")
     return target_preset.to_dict(include_schedules=True)
 
+def deactivate_all_presets():
+    """Deactivates all presets."""
+    updated_rows = Preset.query.filter_by(is_active=True).update({'is_active': False})
+    db.session.commit()
+    if updated_rows > 0:
+        logger.info(f"Deactivated {updated_rows} preset(s).")
+        return {"status": "success", "message": "All presets deactivated."}
+    return {"status": "info", "message": "No presets were active."}
+
 def add_schedule_to_preset(preset_id, data):
     """Adds a new schedule to a preset."""
     preset = Preset.query.get(preset_id)
@@ -168,13 +177,13 @@ def delete_schedule(schedule_id):
 
 # --- Scheduler Logic ---
 
-def scheduler_loop():
+def scheduler_loop(app):
     """The main loop for the irrigation scheduler."""
     global scheduler_running
     logger.info("Irrigation scheduler started.")
     while scheduler_running:
         try:
-            with current_app.app_context():
+            with app.app_context():
                 check_schedules()
         except Exception as e:
             logger.error(f"Error in scheduler loop: {e}")
@@ -226,11 +235,10 @@ def init_scheduler(app):
     """Initializes and starts the scheduler thread."""
     global scheduler_thread, scheduler_running
     if not scheduler_thread:
-        with app.app_context():
-            scheduler_running = True
-            scheduler_thread = threading.Thread(target=scheduler_loop)
-            scheduler_thread.daemon = True
-            scheduler_thread.start()
+        scheduler_running = True
+        scheduler_thread = threading.Thread(target=scheduler_loop, args=(app,))
+        scheduler_thread.daemon = True
+        scheduler_thread.start()
     logger.info("Irrigation scheduler initialized.")
 
 def shutdown_scheduler():

@@ -138,10 +138,10 @@ def create_app(config_class=Config):
         return render_template('index.html')
         
     # Add server time endpoint to fix 404 error
-    @app.route('/api/server-time/display', methods=['GET'])
+    @app.route('/api/server-time', methods=['GET'])
     def server_time():
         from datetime import datetime
-        return {"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+        return {"time": datetime.now().isoformat()}
     
     def signal_handler(sig, frame):
         """Handle SIGINT (Ctrl+C) gracefully."""

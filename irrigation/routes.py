@@ -63,6 +63,11 @@ def activate_preset_route(preset_id):
         return jsonify(preset)
     return jsonify({'message': 'Preset not found'}), 404
 
+@irrigation_bp.route('/api/presets/deactivate', methods=['POST'])
+def deactivate_presets_route():
+    result = controllers.deactivate_all_presets()
+    return jsonify(result)
+
 @irrigation_bp.route('/api/presets/<int:preset_id>/schedules', methods=['POST'])
 def add_schedule_route(preset_id):
     data = request.json
