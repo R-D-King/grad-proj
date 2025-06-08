@@ -28,7 +28,7 @@ from weather.models import WeatherData
 from irrigation.models import Preset, PumpLog, IrrigationLog
 
 # Set default configuration values for key operational parameters
-os.environ.setdefault('UI_UPDATE_INTERVAL', '0.5')  # Broadcast UI updates every 500ms
+os.environ.setdefault('UI_UPDATE_INTERVAL', '2')  # Broadcast UI updates every 2 seconds
 os.environ.setdefault('DB_UPDATE_INTERVAL', '60')  # 60 seconds default
 os.environ.setdefault('NETWORK_UPDATE_INTERVAL', '60') # 60 seconds default
 

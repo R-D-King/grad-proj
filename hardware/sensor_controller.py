@@ -68,15 +68,17 @@ class SensorController:
             try:
                 reading = sensor_instance.read()
                 with self.readings_lock:
-                    if isinstance(keys_to_update, list): # For DHT
+                    if sensor_name == 'pressure' and isinstance(reading, (list, tuple)) and len(reading) > 1:
+                        # Handle BMP180 returning (temp, pressure)
+                        self.last_readings['pressure'] = reading[1]
+                    elif isinstance(keys_to_update, list): # For DHT
                         for key in keys_to_update:
                             self.last_readings[key] = reading.get(key)
                     else: # For other sensors
                         self.last_readings[keys_to_update] = reading
                 
-                # Dynamic sleep based on sensor type to prevent overwhelming hardware
-                sleep_interval = 2 if sensor_name == 'dht' else 1
-                time.sleep(sleep_interval)
+                # Sleep for 2 seconds as requested for stability
+                time.sleep(2)
 
             except Exception as e:
                 logger.error(f"Error reading from {sensor_name}: {e}")
