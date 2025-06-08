@@ -313,17 +313,15 @@ class SensorController:
                 logger.error(f"Error in CSV logging loop: {e}")
                 time.sleep(10)
     
-    def get_sensor_status(self):
-        """Get the status of all sensors (real vs simulated)."""
-        status = {}
-        if not self.sensors:
-            return {}
-
+    def get_sensor_statuses(self):
+        """Get the connection status of all initialized sensors."""
+        statuses = {}
         for name, sensor_obj in self.sensors.items():
-            is_simulated = sensor_obj is None
-            status[f'{name}_simulated'] = is_simulated
-
-        return status
+            if sensor_obj:
+                statuses[name] = "Connected"
+            else:
+                statuses[name] = "Disconnected"
+        return statuses
     
     def start_monitoring(self):
         """Start monitoring sensors at configured intervals."""
@@ -358,14 +356,10 @@ class SensorController:
         logger.info(f"Database sensor monitoring started with interval {self.db_update_interval}s")
     
     def stop_monitoring(self):
-        """Stop the sensor monitoring threads."""
+        """Stop all monitoring threads."""
         self.running = False
-        if hasattr(self, 'ui_thread') and self.ui_thread.is_alive():
-            self.ui_thread.join(timeout=1.0)
-        if hasattr(self, 'db_thread') and self.db_thread.is_alive():
-            self.db_thread.join(timeout=1.0)
-        if hasattr(self, 'logging_thread') and self.logging_thread.is_alive():
-            self.logging_thread.join(timeout=1.0)
+        if self.logging_thread and self.logging_thread.is_alive():
+            self.logging_thread.join()  # Wait for the thread to finish
         logger.info("Sensor monitoring stopped")
     
     def _ui_monitoring_loop(self):

@@ -72,28 +72,40 @@
                 </div>
             </div>
         </div>
-        <!-- Add this right after your weather data section -->
-<div class="card mt-3">
-    <div class="card-header bg-info text-white">
-        <h5 class="mb-0">Sensor Status</h5>
-    </div>
-    <div class="card-body">
-        <ul class="list-group list-group-flush" id="sensor-status">
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                Temperature & Humidity
-                <span class="badge bg-primary" id="dht-status">Checking...</span>
-            </li>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                Soil Moisture
-                <span class="badge bg-primary" id="soil-status">Checking...</span>
-            </li>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                Water Level
-                <span class="badge bg-warning" id="water-status">Simulated</span>
-            </li>
-        </ul>
-    </div>
-</div>
+        <!-- Sensor Status -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Sensor Status</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush" id="sensor-status-list">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Temperature & Humidity (DHT22)
+                        <span class="badge" id="dht-status">Checking...</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Soil Moisture
+                        <span class="badge" id="soil_moisture-status">Checking...</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Pressure (BMP180)
+                        <span class="badge" id="pressure-status">Checking...</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Light (LDR)
+                        <span class="badge" id="light-status">Checking...</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Rain Sensor
+                        <span class="badge" id="rain-status">Checking...</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Water Level
+                        <span class="badge" id="water_level-status">Checking...</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
         <!-- Irrigation Presets -->
         <div class="row mt-4">
             <div class="col-md-12">

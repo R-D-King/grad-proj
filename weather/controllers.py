@@ -5,6 +5,7 @@ from .models import WeatherData
 import time
 import threading
 import logging
+from flask import current_app
 
 # Import the sensor controller
 from hardware.sensor_controller import SensorController
@@ -18,7 +19,7 @@ import platform
 import os
 
 # Get configuration from environment or use defaults
-UI_UPDATE_INTERVAL = int(os.environ.get('UI_UPDATE_INTERVAL', 1))  # 1 second default
+UI_UPDATE_INTERVAL = int(os.environ.get('UI_UPDATE_INTERVAL', 2))  # 2 seconds default
 DB_UPDATE_INTERVAL = int(os.environ.get('DB_UPDATE_INTERVAL', 60))  # 60 seconds default
 
 sensor_controller = SensorController()
@@ -29,41 +30,23 @@ lcd_thread = None
 lcd_running = False
 
 def init_app(app):
-    """Initialize the weather controller with the app context."""
+    """Initialize the weather controller with the Flask app context."""
     global lcd, lcd_thread, lcd_running
     
-    # Set the socketio instance for the sensor controller
+    sensor_controller.set_app(app)
     sensor_controller.set_socketio(socketio)
     
-    # Set the Flask app instance for the sensor controller
-    sensor_controller.set_app(app)
-    
-    # Start sensor monitoring with configured intervals
-    sensor_controller.start_monitoring()
-    
-    # Initialize LCD display with configuration from app
     try:
-        # Get LCD configuration from app config
         config = app.config.get_namespace('')
         lcd_config = config.get('hardware', {}).get('sensors', {}).get('pins', {}).get('lcd', {})
-        
-        # Extract LCD parameters with defaults as fallback
-        cols = lcd_config.get('cols', 16)
-        rows = lcd_config.get('rows', 2)
-        pin_rs = lcd_config.get('pin_rs', 25)
-        pin_e = lcd_config.get('pin_e', 24)
-        pins_data = lcd_config.get('pins_data', [23, 17, 18, 22])
-        
-        # Initialize LCD
         lcd = LCD(
-            cols=cols, 
-            rows=rows, 
-            pin_rs=pin_rs, 
-            pin_e=pin_e, 
-            pins_data=pins_data
+            cols=lcd_config.get('cols', 16), 
+            rows=lcd_config.get('rows', 2), 
+            pin_rs=lcd_config.get('pin_rs', 25), 
+            pin_e=lcd_config.get('pin_e', 24), 
+            pins_data=lcd_config.get('pins_data', [23, 17, 18, 22])
         )
         
-        # Display network name, IP and port on LCD
         from app import get_network_ssid
         network_ssid = get_network_ssid()
         ip_address = app.config.get('IP_ADDRESS', '127.0.0.1')
@@ -73,16 +56,23 @@ def init_app(app):
         lcd.write_line(0, f"Network: {network_ssid}")
         lcd.write_line(1, f"{ip_address}")
         
-        # Start LCD update thread
         lcd_running = True
         lcd_thread = threading.Thread(target=lcd_update_loop, args=(app,))
         lcd_thread.daemon = True
         lcd_thread.start()
-        
         logger.info("LCD display initialized and update thread started")
     except Exception as e:
         logger.error(f"Failed to initialize LCD display: {e}")
         lcd = None
+
+    update_thread = socketio.start_background_task(target=emit_sensor_updates, app=app)
+    setattr(update_thread, "do_run", True)
+
+    status_thread = socketio.start_background_task(target=emit_sensor_status, app=app)
+    setattr(status_thread, "do_run", True)
+
+    logger.info("Weather controller initialized and monitoring started.")
+    return sensor_controller
 
 def get_pressure_display():
     """Get formatted pressure display data."""
@@ -144,105 +134,49 @@ def get_rain_display():
 def lcd_update_loop(app):
     """Background thread for updating LCD display."""
     global lcd_running
-    
-    # Wait 5 seconds to keep showing IP and port
     time.sleep(5)
     
-    # Define display modes and their data
     from app import get_network_ssid
     display_modes = [
-        # Mode 0: Network Name (SSID)
-        lambda: (f"Network:", 
-                f"{get_network_ssid()}"),
-        
-        # Mode 1: IP and Port
-        lambda: (f"{app.config.get('IP_ADDRESS', '127.0.0.1')[:16]}", 
-                f"Port:{app.config.get('PORT', 5000)}"),
-        
-        # Mode 2: Temperature and Humidity
-        lambda: (f"Temp: {sensor_controller.get_latest_readings().get('temperature', 0):.1f}C", 
-                f"Humid: {sensor_controller.get_latest_readings().get('humidity', 0):.1f}%"),
-        
-        # Mode 3: Soil Moisture
-        lambda: (f"Soil Moisture:", 
-                f"{sensor_controller.get_latest_readings().get('soil_moisture', 0):.1f}%"),
-        
-        # Mode 4: Pressure from BMP180
-        lambda: get_pressure_display(),
-        
-        # Mode 5: Light Percentage from LDR
-        lambda: get_light_display(),
-                
-        # Mode 6: Rain Percentage
-        lambda: get_rain_display()
+        lambda: (f"Network:", f"{get_network_ssid()}"),
+        lambda: (f"{app.config.get('IP_ADDRESS', '127.0.0.1')[:16]}", f"Port:{app.config.get('PORT', 5000)}"),
+        lambda: (f"Temp: {sensor_controller.get_latest_readings().get('temperature', 0):.1f}C", f"Humid: {sensor_controller.get_latest_readings().get('humidity', 0):.1f}%"),
+        lambda: (f"Soil Moisture:", f"{sensor_controller.get_latest_readings().get('soil_moisture', 0):.1f}%"),
+        lambda: (f"Pressure:", f"{sensor_controller.get_latest_readings().get('pressure', 0):.1f} hPa"),
+        lambda: (f"Light Level:", f"{sensor_controller.get_latest_readings().get('light', 0):.1f}%"),
+        lambda: (f"Rain Level:", f"{sensor_controller.get_latest_readings().get('rain', 0):.1f}%")
     ]
     
     current_mode = 0
-    
     while lcd_running and lcd:
         try:
-            # Get data for current display mode
             line1, line2 = display_modes[current_mode]()
-            
-            # Update LCD
             lcd.clear()
             lcd.write_line(0, line1)
             lcd.write_line(1, line2)
-            
-            # Cycle to next mode
             current_mode = (current_mode + 1) % len(display_modes)
-            
-            # Wait before changing display
             time.sleep(3)
         except Exception as e:
-            # Don't print error to terminal
+            logger.error(f"Error in LCD update loop: {e}")
             time.sleep(1)
 
 def get_latest_weather_data():
-    """Get the latest weather data."""
-    # First try to get data from the database
-    data = WeatherData.query.order_by(WeatherData.timestamp.desc()).first()
-    
-    if data:
-        return data.to_dict()
-    
-    # If no data in database, use sensor readings
-    sensor_data = sensor_controller.get_latest_readings()
-    return {
-        'temperature': sensor_data.get('temperature', 0),
-        'humidity': sensor_data.get('humidity', 0),
-        'soil_moisture': sensor_data.get('soil_moisture', 0),
-        'pressure': 0,    # We don't have a pressure sensor
-        'timestamp': sensor_data.get('timestamp', datetime.now().isoformat())
-    }
+    """Get the latest weather data from the controller."""
+    return sensor_controller.get_latest_readings()
 
-def update_weather_data(data=None):
-    """Update weather data in the database with current sensor readings."""
-    if data:
-        # Use provided data if available
-        new_data = WeatherData(
-            temperature=data.get('temperature', 0),
-            humidity=data.get('humidity', 0),
-            soil_moisture=data.get('soil_moisture', 0),
-            pressure=data.get('pressure', 0),
-            light=data.get('light', 0),
-            rain=data.get('rain', 0)
-        )
-    else:
-        # Otherwise, fetch new readings
-        readings = sensor_controller.update_readings()
-        new_data = WeatherData(
-            temperature=readings.get('temperature', 0),
-            humidity=readings.get('humidity', 0),
-            soil_moisture=readings.get('soil_moisture', 0),
-            pressure=readings.get('pressure', 0),
-            light=readings.get('light', 0),
-            rain=readings.get('rain', 0)
-        )
-    
+def update_weather_data(data):
+    """Update weather data in the database."""
+    new_data = WeatherData(
+        temperature=data.get('temperature'),
+        humidity=data.get('humidity'),
+        soil_moisture=data.get('soil_moisture'),
+        pressure=data.get('pressure'),
+        light=data.get('light'),
+        rain=data.get('rain')
+    )
     db.session.add(new_data)
     db.session.commit()
-    logger.debug("Weather data updated in the database")
+    logger.info(f"Logged new weather data to database: {data}")
 
 def get_network_ssid():
     """Get the SSID of the connected WiFi network."""
@@ -268,3 +202,21 @@ def display_shutdown():
             lcd.write_line(1, "Shutting Down...")
         except Exception:
             pass
+
+def emit_sensor_updates(app):
+    """Continuously emit sensor data updates to clients."""
+    ui_update_interval = app.config.get('UI_UPDATE_INTERVAL', 2)
+    while getattr(threading.current_thread(), "do_run", True):
+        with app.app_context():
+            sensor_data = sensor_controller.get_latest_readings()
+            socketio.emit('sensor_update', sensor_data)
+        socketio.sleep(ui_update_interval)
+
+def emit_sensor_status(app):
+    """Periodically emit the connection status of sensors."""
+    status_update_interval = app.config.get('SENSOR_STATUS_INTERVAL', 5) # 5 seconds
+    while getattr(threading.current_thread(), "do_run", True):
+        with app.app_context():
+            statuses = sensor_controller.get_sensor_statuses()
+            socketio.emit('sensor_status_update', statuses)
+        socketio.sleep(status_update_interval)

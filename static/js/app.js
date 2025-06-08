@@ -16,12 +16,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Listen for sensor updates
     socket.on('sensor_update', function(data) {
         console.log('Sensor update received:', data);
-        updateElementText('temp', data.temperature);
-        updateElementText('humidity', data.humidity);
-        updateElementText('soil-moisture', data.soil_moisture);
+        updateElementText('temp', data.temperature ? data.temperature.toFixed(2) : '--');
+        updateElementText('humidity', data.humidity ? data.humidity.toFixed(2) : '--');
+        updateElementText('soil-moisture', data.soil_moisture ? data.soil_moisture.toFixed(2) : '--');
         updateElementText('pressure', data.pressure);
-        updateElementText('light-percentage', data.light);
-        updateElementText('rain-percentage', data.rain);
+        updateElementText('light-percentage', data.light ? data.light.toFixed(2) : '--');
+        updateElementText('rain-percentage', data.rain ? data.rain.toFixed(2) : '--');
     });
 
     // Listen for pump status updates
@@ -39,6 +39,25 @@ document.addEventListener('DOMContentLoaded', function() {
     socket.on('water_level_update', function(data) {
         console.log('Water level update received:', data);
         updateElementText('water-level', `${data.level}%`);
+    });
+    
+    // Listen for sensor status updates
+    socket.on('sensor_status_update', function(statuses) {
+        console.log('Sensor statuses received:', statuses);
+        for (const sensorName in statuses) {
+            const status = statuses[sensorName];
+            const badge = document.getElementById(`${sensorName}-status`);
+            if (badge) {
+                badge.textContent = status;
+                if (status === 'Connected') {
+                    badge.className = 'badge bg-success';
+                } else if (status === 'Disconnected') {
+                    badge.className = 'badge bg-danger';
+                } else {
+                    badge.className = 'badge bg-secondary';
+                }
+            }
+        }
     });
     
     // Set up clock with reduced frequency (every 10 seconds)
@@ -662,38 +681,17 @@ function generateReport() {
 }
 
 // Helper function to get report options
-function getReportOptions() {
-    const reportType = document.getElementById('report-type').value;
+function getReportOptions(reportType) {
     const options = {};
-    
-    // Get all option checkboxes for the current report type
-    const optionElements = document.querySelectorAll(`.report-options-${reportType} input[type="checkbox"]`);
-    
-    // If no option elements found, return default options
-    if (!optionElements || optionElements.length === 0) {
-        if (reportType === 'weather') {
-            return {
-                temperature: true,
-                humidity: true,
-                soil_moisture: true
-            };
-        } else if (reportType === 'irrigation') {
-            return {
-                pump_status: true,
-                water_level: true,
-                duration: true
-            };
-        }
-        return {};
+    const container = document.getElementById(`${reportType}-options`);
+    if (container) {
+        const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+            // Derives 'temperature' from 'weather-temperature'
+            const optionName = checkbox.id.replace(`${reportType}-`, ''); 
+            options[optionName] = checkbox.checked;
+        });
     }
-    
-    // Process each checkbox
-    optionElements.forEach(element => {
-        if (element && element.checked !== undefined) {
-            options[element.id.replace(`${reportType}-option-`, '')] = element.checked;
-        }
-    });
-    
     return options;
 }
 
@@ -715,21 +713,30 @@ function displayReport(data, reportType) {
     // Create table headers based on report type and available data
     let headers = ['Date', 'Time'];
     
-    // Get the selected options
+    // Get the selected options to build headers dynamically
     const options = getReportOptions(reportType);
-    
-    if (reportType === 'weather') {
-        // Add weather-specific headers based on selected options
-        if (options.temperature) headers.push('Temperature (°C)');
-        if (options.humidity) headers.push('Humidity (%)');
-        if (options.soil_moisture) headers.push('Soil Moisture (%)');
-        if (options.wind_speed) headers.push('Wind Speed (km/h)');
-        if (options.pressure) headers.push('Pressure (hPa)');
-    } else {
-        // Add irrigation-specific headers based on selected options
-        if (options.pump_status) headers.push('Pump Status');
-        if (options.water_level) headers.push('Water Level (%)');
-        if (options.duration) headers.push('Duration (s)');
+
+    const headerMapping = {
+        weather: {
+            temperature: 'Temperature (°C)',
+            humidity: 'Humidity (%)',
+            soil_moisture: 'Soil Moisture (%)',
+            pressure: 'Pressure (hPa)',
+            light: 'Light (%)',
+            rain: 'Rain (%)'
+        },
+        irrigation: {
+            pump_status: 'Pump Status',
+            water_level: 'Water Level (%)',
+            duration: 'Duration (s)'
+        }
+    };
+
+    const reportHeaders = headerMapping[reportType];
+    for (const key in reportHeaders) {
+        if (options[key]) {
+            headers.push(reportHeaders[key]);
+        }
     }
     
     // Create table HTML
@@ -754,18 +761,16 @@ function displayReport(data, reportType) {
         tableHTML += `<td>${date}</td>`;
         tableHTML += `<td>${time}</td>`;
         
-        if (reportType === 'weather') {
-            // Add weather-specific data based on selected options
-            if (options.temperature) tableHTML += `<td>${item.temperature !== undefined ? item.temperature : '-'}</td>`;
-            if (options.humidity) tableHTML += `<td>${item.humidity !== undefined ? item.humidity : '-'}</td>`;
-            if (options.soil_moisture) tableHTML += `<td>${item.soil_moisture !== undefined ? item.soil_moisture : '-'}</td>`;
-            if (options.wind_speed) tableHTML += `<td>${item.wind_speed !== undefined ? item.wind_speed : '-'}</td>`;
-            if (options.pressure) tableHTML += `<td>${item.pressure !== undefined ? item.pressure : '-'}</td>`;
-        } else {
-            // Add irrigation-specific data based on selected options
-            if (options.pump_status) tableHTML += `<td>${item.pump_status !== undefined ? (item.pump_status ? 'Running' : 'Stopped') : '-'}</td>`;
-            if (options.water_level) tableHTML += `<td>${item.water_level !== undefined ? item.water_level : '-'}</td>`;
-            if (options.duration) tableHTML += `<td>${item.duration !== undefined ? item.duration : '-'}</td>`;
+        for (const key in reportHeaders) {
+            if (options[key]) {
+                let value = item[key];
+                if (key === 'pump_status') {
+                    value = value ? 'On' : 'Off';
+                } else if (value === null || value === undefined) {
+                    value = '--';
+                }
+                tableHTML += `<td>${value}</td>`;
+            }
         }
         
         tableHTML += '</tr>';
