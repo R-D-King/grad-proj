@@ -6,6 +6,7 @@ eventlet.monkey_patch()
 import signal
 import sys
 import time    # For the sleep function in signal handler
+import threading
 from flask import Flask, render_template, request, has_request_context
 from shared.database import db
 from shared.socketio import socketio
@@ -24,6 +25,7 @@ import logging
 # Set default configuration values for key operational parameters
 os.environ.setdefault('UI_UPDATE_INTERVAL', '1')  # 1 second default
 os.environ.setdefault('DB_UPDATE_INTERVAL', '60')  # 60 seconds default
+os.environ.setdefault('NETWORK_UPDATE_INTERVAL', '60') # 60 seconds default
 
 def get_ip_address():
     """Get the primary IP address of the device"""
@@ -52,6 +54,28 @@ def get_network_ssid():
     except Exception as e:
         print(f"Error getting network SSID: {e}")
         return "Unknown"
+
+def update_network_info(app):
+    """Updates network IP and SSID in app config."""
+    ip_address = get_ip_address()
+    network_ssid = get_network_ssid()
+    
+    current_ip = app.config.get('IP_ADDRESS')
+    current_ssid = app.config.get('NETWORK_SSID')
+
+    if ip_address != current_ip or network_ssid != current_ssid:
+        logging.info(f"Network change detected. New IP: {ip_address}, New SSID: {network_ssid}")
+        app.config['IP_ADDRESS'] = ip_address
+        app.config['NETWORK_SSID'] = network_ssid
+
+def network_update_loop(app):
+    """Periodically updates network information."""
+    interval = app.config.get('NETWORK_UPDATE_INTERVAL', 60)
+    logging.info(f"Network info will be updated every {interval} seconds.")
+    
+    while getattr(app, 'network_thread_running', False):
+        update_network_info(app)
+        eventlet.sleep(interval)
 
 def create_app(config_class=Config):
     # Configure logging to show INFO level messages in the terminal
@@ -115,6 +139,9 @@ def create_app(config_class=Config):
         """Handle SIGINT (Ctrl+C) gracefully."""
         logging.info("\nReceived SIGINT")
         
+        if hasattr(app, 'network_thread_running'):
+            app.network_thread_running = False
+        
         # Use a non-blocking approach for LCD
         try:
             from weather.controllers import sensor_controller
@@ -144,19 +171,16 @@ def create_app(config_class=Config):
 
 if __name__ == '__main__':
     app = create_app()
+    app.network_thread_running = True
     
     # Get configuration values
     config = app.config.get_namespace('')
     
-    # Get the device's IP address
-    ip_address = get_ip_address()
+    # Initial network info fetch
+    update_network_info(app)
     
-    # Get the network SSID
-    network_ssid = get_network_ssid()
-    
-    # Store IP address and network SSID in app config for LCD display
-    app.config['IP_ADDRESS'] = ip_address
-    app.config['NETWORK_SSID'] = network_ssid
+    # Start network update loop
+    eventlet.spawn(network_update_loop, app)
     
     # Run the application
     host = config.get('HOST', '0.0.0.0')
@@ -164,22 +188,23 @@ if __name__ == '__main__':
     debug = config.get('DEBUG', False)
     
     # Print server information first with actual IP address
-    logging.info("\n" + "=" * 60)
-    logging.info(f"Starting Irrigation Control System Server")
-    logging.info(f"Local access:  http://localhost:{port}")
-    logging.info(f"Network access: http://{ip_address}:{port}")
-    logging.info("=" * 60 + "\n")
+    print("\n" + "=" * 60)
+    print(f"Starting Irrigation Control System Server")
+    print(f"Local access:  http://localhost:{port}")
+    print(f"Network access: http://{app.config.get('IP_ADDRESS')}:{port}")
+    print("=" * 60 + "\n")
     
     # Print configuration information
-    logging.info(f"UI update interval: {config.get('UI_UPDATE_INTERVAL', 1)} seconds")
-    logging.info(f"Database update interval: {config.get('DB_UPDATE_INTERVAL', 60)} seconds")
+    print(f"UI update interval: {config.get('UI_UPDATE_INTERVAL', 1)} seconds")
+    print(f"Database update interval: {config.get('DB_UPDATE_INTERVAL', 60)} seconds")
+    print(f"Network check interval: {config.get('NETWORK_UPDATE_INTERVAL', 60)} seconds")
     
     # Initialize weather controller with app context - moved here to run after server info is displayed
     from weather.controllers import init_app as init_weather
-    logging.info("\nChecking connected devices:")
-    logging.info("-" * 30)
+    print("\nChecking connected devices:")
+    print("-" * 30)
     init_weather(app)
-    logging.info("-" * 30)
+    print("-" * 30)
     
     # Start the server
     socketio.run(app, host=host, port=port, debug=debug)

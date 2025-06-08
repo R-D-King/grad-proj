@@ -76,6 +76,7 @@ class Config:
         "DB_UPDATE_INTERVAL": "hardware.sensors.db_update_interval",
         "PORT": "server.port",
         "DEBUG": "server.debug",
+        "NETWORK_UPDATE_INTERVAL": "server.network_update_interval",
         "DATA_RETENTION_DAYS": "database.retention.max_days",
         "DATA_RETENTION_ENABLED": "database.retention.enabled"
     }

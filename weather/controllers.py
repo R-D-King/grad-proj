@@ -242,7 +242,7 @@ def update_weather_data(data=None):
     
     db.session.add(new_data)
     db.session.commit()
-    logger.info("Weather data updated in the database")
+    logger.debug("Weather data updated in the database")
 
 def get_network_ssid():
     """Get the SSID of the connected WiFi network."""

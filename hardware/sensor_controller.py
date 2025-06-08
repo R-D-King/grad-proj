@@ -335,7 +335,7 @@ class SensorController:
                 readings = self.update_readings()
                 self._validate_readings(readings)
                 self._log_data_to_csv(readings)
-                logger.info(f"Sensor data logged to CSV file.")
+                logger.debug(f"Sensor data logged to CSV file.")
                 
                 time.sleep(self.log_interval)
             except Exception as e:
@@ -414,7 +414,7 @@ class SensorController:
         """Background thread for updating database with sensor readings."""
         while self.running:
             try:
-                now = a= time.time()
+                now = time.time()
                 if now - self.last_db_update >= self.db_update_interval:
                     readings = self.update_readings()
                     with self.app.app_context():
@@ -427,7 +427,7 @@ class SensorController:
                             'light': readings.get('light', 0) if readings.get('light') is not None else 0,
                             'rain': readings.get('rain', 0) if readings.get('rain') is not None else 0
                         }
-                        logger.info(f"Updating database with sensor readings: {update_data}")
+                        logger.debug(f"Updating database with sensor readings: {update_data}")
                         update_weather_data(update_data)
                     self.last_db_update = now
             except Exception as e:

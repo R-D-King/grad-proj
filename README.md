@@ -15,6 +15,7 @@ A web-based irrigation system with weather monitoring capabilities.
 - Light level monitoring with LDR sensor
 - Rain detection with rain sensor
 - Pressure and altitude monitoring with BMP180 sensor
+- Periodic network status monitoring (IP address and SSID)
 
 ## Setup
 
@@ -147,30 +148,6 @@ The application uses WebSockets for real-time updates:
 - `pump_status_change` - Sent when the pump status changes
 - `sensor_update` - Sent when new sensor readings are available
 
-## Resolved Issues
-
-The following issues have been fixed:
-
-1. Pump Control:
-   - ✅ Fixed pump duration tracking and display
-   - ✅ Resolved type mismatch error when stopping the pump
-   - ✅ Pump duration now correctly recorded in the database
-
-2. Report Generation:
-   - ✅ Report options now properly filter displayed data
-   - ✅ Clear button for reports is now functioning
-
-3. Date Selection:
-   - ✅ Default dates for reports now display properly
-
-4. Report Filtering:
-   - ✅ Report data now only shows selected columns
-   - ✅ Downloaded CSV reports only include selected data columns
-
-5. UI Display:
-   - ✅ Fixed water level display showing duplicate percentage signs
-   - ✅ Running time counter now displays integer values without decimal places
-
 ## Known Issues
 
 The following issues are currently being addressed:
@@ -212,7 +189,7 @@ The following issues are currently being addressed:
 ### Database Schema
 
 The application uses SQLAlchemy with the following main models:
-- `WeatherData` - Stores weather sensor readings
+- `WeatherData` - Stores weather sensor readings (temperature, humidity, soil moisture, pressure, light, and rain)
 - `Preset` - Stores irrigation configuration presets
 - `Schedule` - Stores scheduled irrigation times
 - `PumpLog` - Records pump start/stop events
@@ -234,6 +211,13 @@ Similarly, the LDR sensor may need calibration for your lighting conditions:
 
 The application can be configured using JSON configuration files in the `config` directory and environment variables for key operational parameters.
 
+## Environment Variables
+- `UI_UPDATE_INTERVAL`: How often sensor readings are sent to the UI (in seconds, default: 1)
+- `DB_UPDATE_INTERVAL`: How often sensor readings are stored in the database (in seconds, default: 60)
+- `NETWORK_UPDATE_INTERVAL`: How often the network status is checked (in seconds, default: 60)
+- `PORT`: The port to run the server on (default: 5000)
+- `DEBUG`: Whether to run the server in debug mode (true/false, default: false)
+
 ## Logging Configuration
 
 Sensor data logging is configured via the `config/logging.json` file. This allows you to enable or disable CSV logging, define where data is saved, and set validation limits.
@@ -247,35 +231,4 @@ Sensor data logging is configured via the `config/logging.json` file. This allow
   "validation_enabled": true,
   "validation_limits": { "...": "..." }
 }
-```
-
-- **`csv_enabled`**: Set to `true` to save sensor readings to daily CSV files.
-- **`data_folder`**: The directory where CSV files are stored. The default `~/sensor_data` resolves to the home directory of the user running the application (e.g., `/home/pi/sensor_data`). A new file is created for each day.
-- **`log_interval`**: The frequency in seconds for writing data to the CSV file. This is independent of the database update interval.
-
-## Environment Variables
-
-The following environment variables can be used to override configuration settings:
-
-- `UI_UPDATE_INTERVAL`: How often sensor readings are sent to the UI (in seconds, default: 1)
-- `DB_UPDATE_INTERVAL`: How often sensor readings are stored in the database (in seconds, default: 60)
-- `PORT`: The port to run the server on (default: 5000)
-- `DEBUG`: Whether to run the server in debug mode (true/false, default: false)
-- `DATA_RETENTION_DAYS`: How many days of data to keep before pruning (default: 30)
-- `DATA_RETENTION_ENABLED`: Whether to enable automatic data pruning (true/false, default: true)
-
-Example of setting configuration on Windows:
-```cmd
-set UI_UPDATE_INTERVAL=2
-set DB_UPDATE_INTERVAL=120
-
-python app.py
-```
-
-Example of setting configuration on Linux/Mac:
-```bash
-export UI_UPDATE_INTERVAL=2
-export DB_UPDATE_INTERVAL=120
-
-python app.py
 ```
