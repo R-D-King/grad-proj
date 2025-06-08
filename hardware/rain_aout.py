@@ -10,7 +10,7 @@ spi.max_speed_hz = 1000000  # Set SPI speed to 1MHz
 RAIN_CHANNEL = 2  # Default to channel 2, can be changed as needed
 
 # Calibration values for the rain sensor
-DRY_VALUE = 1023   # Value when sensor is completely dry
+DRY_VALUE = 980 # Value when sensor is completely dry
 WET_VALUE = 300    # Value when sensor is wet (adjust based on your sensor)
 
 def read_channel(channel):

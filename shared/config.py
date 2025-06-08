@@ -63,7 +63,7 @@ class Config:
                 },
                 "rain": {
                     "channel": 2,
-                    "dry_value": 1023,
+                    "dry_value": 980,
                     "wet_value": 300
                 }
             }
