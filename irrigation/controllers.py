@@ -10,20 +10,27 @@ from .models import Preset, Schedule, IrrigationLog
 # Setup logging
 logger = logging.getLogger(__name__)
 
+# --- Hardware Initialization ---
+try:
+    from hardware.pump import Pump
+    pump = Pump()
+except Exception as e:
+    logger.error(f"Could not import hardware pump: {e}. Running in simulated mode.")
+    class DummyPump:
+        def start(self):
+            logger.warning("Running in dummy mode. Pump not started.")
+            return True
+        def stop(self):
+            logger.warning("Running in dummy mode. Pump not stopped.")
+            return True
+    pump = DummyPump()
+
 # In-memory state for pump and scheduler
 pump_running = False
 pump_start_time = None
 pump_lock = threading.Lock()
 scheduler_thread = None
 scheduler_running = False
-
-# Import hardware control at the top level
-try:
-    from hardware.pump import pump
-except (ImportError, RuntimeError) as e:
-    logger.error(f"Could not import hardware pump: {e}. Running in simulated mode.")
-    from hardware.sensor_simulation import SimulatedPump
-    pump = SimulatedPump()
 
 # --- Pump Control ---
 
@@ -49,7 +56,7 @@ def start_pump(duration_seconds=None):
             return {"status": "warning", "message": "Pump is already running."}
         
         logger.info("Starting pump manually.")
-        pump.turn_on()
+        pump.start()
         pump_running = True
         pump_start_time = time.time()
         
@@ -74,7 +81,7 @@ def stop_pump():
         
         duration = get_pump_duration()
         logger.info(f"Stopping pump manually after {duration:.2f} seconds.")
-        pump.turn_off()
+        pump.stop()
         pump_running = False
         pump_start_time = None
         
