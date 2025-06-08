@@ -65,11 +65,16 @@ def init_app(app):
         logger.error(f"Failed to initialize LCD display: {e}")
         lcd = None
 
+    # Start the monitoring thread for UI sensor data
     update_thread = socketio.start_background_task(target=emit_sensor_updates, app=app)
     setattr(update_thread, "do_run", True)
 
+    # Start the monitoring thread for sensor connection status
     status_thread = socketio.start_background_task(target=emit_sensor_status, app=app)
     setattr(status_thread, "do_run", True)
+
+    # Start the CSV logging thread
+    sensor_controller.start_csv_logging()
 
     logger.info("Weather controller initialized and monitoring started.")
     return sensor_controller

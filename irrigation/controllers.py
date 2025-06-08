@@ -1,224 +1,235 @@
 import time
 import threading
-import logging  # Add this import
-from datetime import datetime
-import eventlet
+import logging
+from datetime import datetime, time as time_obj
 from flask import current_app
 from shared.database import db
-from hardware.relay import Relay
-from hardware.water_level import WaterLevelSensor
-from .models import Preset, PumpLog, IrrigationLog
+from shared.socketio import socketio
+from .models import Preset, Schedule, IrrigationLog
 
-# Set up logging
+# Setup logging
 logger = logging.getLogger(__name__)
 
-# Initialize hardware
-pump = Relay(pin=17, name="Water Pump")
-water_level_sensor = WaterLevelSensor()
-
-# Global variables for pump state
+# In-memory state for pump and scheduler
 pump_running = False
 pump_start_time = None
 pump_lock = threading.Lock()
+scheduler_thread = None
+scheduler_running = False
+
+# Import hardware control at the top level
+try:
+    from hardware.pump import pump
+except (ImportError, RuntimeError) as e:
+    logger.error(f"Could not import hardware pump: {e}. Running in simulated mode.")
+    from hardware.sensor_simulation import SimulatedPump
+    pump = SimulatedPump()
+
+# --- Pump Control ---
+
+def get_pump_duration():
+    """Calculates how long the pump has been running."""
+    if pump_running and pump_start_time:
+        return time.time() - pump_start_time
+    return 0
 
 def get_pump_status():
-    """Get the current status of the irrigation pump."""
+    """Returns the current status of the pump."""
     with pump_lock:
         return {
             "running": pump_running,
-            "start_time": pump_start_time.isoformat() if pump_start_time else None,
-            "duration": get_pump_duration() if pump_running else 0
+            "duration": get_pump_duration()
         }
 
-def get_pump_duration():
-    """Get the current duration of the pump running in seconds."""
-    if not pump_running or not pump_start_time:
-        return 0
-    
-    return (datetime.now() - pump_start_time).total_seconds()
-
-def get_water_level():
-    """Get the current water level."""
-    level = water_level_sensor.get_level()
-    return {
-        "level": level,
-        "status": "OK" if level > 20 else "LOW"
-    }
-
-def log_pump_action(action, duration=None):
-    """Log pump actions to the database."""
-    log = PumpLog(
-        action=action,
-        duration=duration if action == 'stop' else None,
-        timestamp=datetime.now()
-    )
-    db.session.add(log)
-    db.session.commit()
-
-def log_irrigation_event(preset_id=None, duration=None, pump_status=None, water_level=None):
-    """Log irrigation events to the database."""
-    log = IrrigationLog(
-        preset_id=preset_id,
-        duration=duration,
-        water_used=calculate_water_used(duration) if duration else None,
-        pump_status=pump_status,
-        water_level=water_level,
-        timestamp=datetime.now()
-    )
-    db.session.add(log)
-    db.session.commit()
-
-def calculate_water_used(duration):
-    """Calculate water used based on duration."""
-    # Assuming a flow rate of 2 liters per minute
-    flow_rate = 2.0 / 60.0  # liters per second
-    return duration * flow_rate if duration else 0
-
-def activate_preset(preset_id):
-    """Activate a specific irrigation preset."""
-    try:
-        # Get the preset from database
-        preset = Preset.query.get(preset_id)
-        if not preset:
-            return {"status": "error", "message": "Preset not found"}
-
-        # Update all presets to inactive
-        Preset.query.update({"active": False})
-        # Set the selected preset as active
-        preset.active = True
-        db.session.commit()
-
-        # Start the pump with preset settings
-        result = start_pump(preset_id=preset_id)
-        
-        return {
-            "status": "success",
-            "message": f"Preset '{preset.name}' activated",
-            "name": preset.name,
-            "pump_status": result
-        }
-    except Exception as e:
-        logger.error(f"Error activating preset {preset_id}: {str(e)}")
-        return {"status": "error", "message": f"Error activating preset: {str(e)}"}
-
-def start_pump():
-    """Start the irrigation pump."""
+def start_pump(duration_seconds=None):
+    """Manually starts the pump, optionally for a specific duration."""
     global pump_running, pump_start_time
-    
     with pump_lock:
-        # Check if pump is already running
         if pump_running:
-            return {"status": "warning", "message": "Water Pump already running", "runtime": get_pump_duration(), "pump_status": pump.get_state()}
+            return {"status": "warning", "message": "Pump is already running."}
         
-        # Check water level
-        water_level = get_water_level()
-        if water_level['level'] < 10:  # 10% minimum water level
-            return {"status": "error", "message": "Water level too low", "water_level": water_level, "pump_status": pump.get_state()}
-        
-        # Start the pump
-        success = pump.turn_on()
-        if not success:
-            return {"status": "error", "message": "Failed to start pump", "pump_status": pump.get_state()}
-        
-        # Update state
+        logger.info("Starting pump manually.")
+        pump.turn_on()
         pump_running = True
         pump_start_time = time.time()
         
-        # Log pump start in database
-        log_pump_action("start")
-        
-        return {
-            "status": "success", 
-            "message": "Water Pump started", 
-            "runtime": 0,
-            "pump_status": pump.get_state()
-        }
+        # If a duration is specified, schedule a stop
+        if duration_seconds:
+            def stop_after_duration():
+                time.sleep(duration_seconds)
+                stop_pump()
+            
+            duration_thread = threading.Thread(target=stop_after_duration)
+            duration_thread.daemon = True
+            duration_thread.start()
+            
+        return {"status": "success", "message": f"Pump started for {duration_seconds}s." if duration_seconds else "Pump started."}
 
 def stop_pump():
-    """Stop the irrigation pump."""
-    global pump_running, pump_start_time, pump_duration
-    
+    """Manually stops the pump."""
+    global pump_running, pump_start_time
     with pump_lock:
         if not pump_running:
-            return {"status": "warning", "message": "Water Pump was not running", "runtime": 0, "pump_status": pump.get_state()}
+            return {"status": "warning", "message": "Pump is not running."}
         
-        # Get the current duration before stopping
-        current_duration = get_pump_duration()
-        
-        # Stop the pump
+        duration = get_pump_duration()
+        logger.info(f"Stopping pump manually after {duration:.2f} seconds.")
         pump.turn_off()
         pump_running = False
         pump_start_time = None
         
-        # Log pump stop in database with duration
-        log_pump_action("stop", current_duration)
+        # Log the manual run
+        log_irrigation_run(None, duration)
         
-        # Log the irrigation event with duration
-        log_irrigation_event(duration=current_duration, pump_status=False, water_level=get_water_level()['level'])
-        
-        return {
-            "status": "success", 
-            "message": "Water Pump stopped", 
-            "runtime": current_duration,
-            "pump_status": pump.get_state()
-        }
+        return {"status": "success", "message": "Pump stopped.", "duration": duration}
 
-def get_presets():
-    """Get all irrigation presets."""
-    presets = Preset.query.all()
-    return [preset.to_dict(include_schedules=True) for preset in presets]
+# --- Preset and Schedule Management ---
 
-def get_preset(preset_id):
-    """Get a specific irrigation preset."""
-    preset = Preset.query.get(preset_id)
-    if preset:
-        return preset.to_dict(include_schedules=True)
-    return None
+def get_all_presets():
+    """Returns all presets with their schedules."""
+    return [p.to_dict(include_schedules=True) for p in Preset.query.all()]
 
 def create_preset(data):
-    """Create a new irrigation preset."""
-    preset = Preset(
-        name=data.get('name', 'New Preset'),
-        active=data.get('active', False),
-        duration=data.get('duration', 300),
-        water_level=data.get('water_level', 50),
-        auto_start=data.get('auto_start', False)
-    )
-    db.session.add(preset)
+    """Creates a new preset."""
+    new_preset = Preset(name=data['name'], description=data.get('description'))
+    db.session.add(new_preset)
     db.session.commit()
-    return preset.to_dict()
+    logger.info(f"Created new preset: {new_preset.name}")
+    return new_preset.to_dict()
 
 def update_preset(preset_id, data):
-    """Update an existing irrigation preset."""
+    """Updates an existing preset."""
+    preset = Preset.query.get(preset_id)
+    if not preset:
+        return None
+    preset.name = data['name']
+    preset.description = data.get('description')
+    db.session.commit()
+    logger.info(f"Updated preset {preset_id}: {preset.name}")
+    return preset.to_dict()
+
+def delete_preset(preset_id):
+    """Deletes a preset."""
+    preset = Preset.query.get(preset_id)
+    if not preset:
+        return False
+    db.session.delete(preset)
+    db.session.commit()
+    logger.info(f"Deleted preset {preset_id}")
+    return True
+
+def activate_preset(preset_id):
+    """Activates a preset and deactivates all others."""
+    with pump_lock:
+        # Deactivate all other presets
+        Preset.query.filter(Preset.id != preset_id).update({'is_active': False})
+        # Activate the target preset
+        target_preset = Preset.query.get(preset_id)
+        if not target_preset:
+            return None
+        target_preset.is_active = True
+        db.session.commit()
+    logger.info(f"Activated preset: {target_preset.name}")
+    return target_preset.to_dict(include_schedules=True)
+
+def add_schedule_to_preset(preset_id, data):
+    """Adds a new schedule to a preset."""
     preset = Preset.query.get(preset_id)
     if not preset:
         return None
     
-    if 'name' in data:
-        preset.name = data['name']
-    if 'active' in data:
-        preset.active = data['active']
-    if 'duration' in data:
-        preset.duration = data['duration']
-    if 'water_level' in data:
-        preset.water_level = data['water_level']
-    if 'auto_start' in data:
-        preset.auto_start = data['auto_start']
-    
+    new_schedule = Schedule(
+        preset_id=preset_id,
+        day_of_week=data['day_of_week'],
+        start_time=datetime.strptime(data['start_time'], '%H:%M').time(),
+        duration_seconds=data['duration_seconds']
+    )
+    db.session.add(new_schedule)
     db.session.commit()
-    return preset.to_dict()
+    logger.info(f"Added new schedule to preset {preset.name}")
+    return new_schedule.to_dict()
 
-def delete_preset(preset_id):
-    """Delete an irrigation preset."""
-    preset = Preset.query.get(preset_id)
-    if not preset:
+def delete_schedule(schedule_id):
+    """Deletes a schedule."""
+    schedule = Schedule.query.get(schedule_id)
+    if not schedule:
         return False
-    
-    db.session.delete(preset)
+    db.session.delete(schedule)
     db.session.commit()
+    logger.info(f"Deleted schedule {schedule_id}")
     return True
 
-def get_irrigation_logs(limit=50):
-    """Get recent irrigation logs."""
-    logs = IrrigationLog.query.order_by(IrrigationLog.timestamp.desc()).limit(limit).all()
-    return [log.to_dict() for log in logs]
+# --- Scheduler Logic ---
+
+def scheduler_loop():
+    """The main loop for the irrigation scheduler."""
+    global scheduler_running
+    logger.info("Irrigation scheduler started.")
+    while scheduler_running:
+        try:
+            with current_app.app_context():
+                check_schedules()
+        except Exception as e:
+            logger.error(f"Error in scheduler loop: {e}")
+        # Check every 60 seconds
+        time.sleep(60)
+    logger.info("Irrigation scheduler stopped.")
+
+def check_schedules():
+    """Checks the active schedule and triggers the pump if needed."""
+    with pump_lock:
+        if pump_running:
+            logger.debug("Scheduler check skipped: pump is already running manually.")
+            return
+
+        active_preset = Preset.query.filter_by(is_active=True).first()
+        if not active_preset:
+            logger.debug("Scheduler check skipped: no active preset.")
+            return
+
+        now = datetime.now()
+        today_str = now.strftime('%A') # e.g., "Monday"
+        
+        schedules_today = active_preset.schedules.filter_by(
+            day_of_week=today_str, 
+            is_active=True
+        ).all()
+
+        for schedule in schedules_today:
+            # Check if current time is within one minute of the scheduled start time
+            if schedule.start_time.hour == now.hour and schedule.start_time.minute == now.minute:
+                logger.info(f"Scheduler: Triggering pump for preset '{active_preset.name}' based on schedule.")
+                start_pump(duration_seconds=schedule.duration_seconds)
+                log_irrigation_run(active_preset.id, schedule.duration_seconds)
+                break # Avoid running multiple schedules in the same minute
+
+def log_irrigation_run(preset_id, duration):
+    """Logs an irrigation event to the database."""
+    log_entry = IrrigationLog(
+        preset_id=preset_id,
+        duration=duration,
+        pump_status=True
+    )
+    db.session.add(log_entry)
+    db.session.commit()
+    logger.info(f"Logged irrigation run. Preset ID: {preset_id}, Duration: {duration:.2f}s")
+
+
+def init_scheduler(app):
+    """Initializes and starts the scheduler thread."""
+    global scheduler_thread, scheduler_running
+    if not scheduler_thread:
+        with app.app_context():
+            scheduler_running = True
+            scheduler_thread = threading.Thread(target=scheduler_loop)
+            scheduler_thread.daemon = True
+            scheduler_thread.start()
+    logger.info("Irrigation scheduler initialized.")
+
+def shutdown_scheduler():
+    """Stops the scheduler thread."""
+    global scheduler_running
+    if scheduler_thread:
+        scheduler_running = False
+        scheduler_thread.join(timeout=1)
+    logger.info("Irrigation scheduler shut down.")

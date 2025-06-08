@@ -323,6 +323,22 @@ class SensorController:
                 statuses[name] = "Disconnected"
         return statuses
     
+    def start_csv_logging(self):
+        """Start the CSV logging thread if enabled."""
+        if not self.csv_logging_enabled:
+            logger.info("CSV logging is disabled, not starting thread.")
+            return
+
+        if self.logging_thread and self.logging_thread.is_alive():
+            logger.warning("CSV logging thread is already running.")
+            return
+
+        self.running = True  # Ensure the loop condition is met
+        self.logging_thread = threading.Thread(target=self._csv_logging_loop)
+        self.logging_thread.daemon = True
+        self.logging_thread.start()
+        logger.info(f"CSV logging thread started with interval {self.log_interval}s")
+
     def start_monitoring(self):
         """Start monitoring sensors at configured intervals."""
         if self.running: return
@@ -334,26 +350,9 @@ class SensorController:
         
         self.running = True
         
-        if self.csv_logging_enabled and not self.logging_thread:
-            # Set up the initial CSV file before starting the thread
-            self.csv_file, self.csv_writer = self._setup_csv_file()
-            self.last_log_day = datetime.now().day
-            logger.info(f"Logging to {self.csv_file.name}")
-
-            self.logging_thread = threading.Thread(target=self._csv_logging_loop)
-            self.logging_thread.daemon = True
-            self.logging_thread.start()
-            logger.info(f"CSV logging thread started with interval {self.log_interval}s")
-        
-        self.ui_thread = threading.Thread(target=self._ui_monitoring_loop)
-        self.ui_thread.daemon = True
-        self.ui_thread.start()
-        logger.info(f"UI sensor monitoring started with interval {self.ui_update_interval}s")
-        
-        self.db_thread = threading.Thread(target=self._db_monitoring_loop)
-        self.db_thread.daemon = True
-        self.db_thread.start()
-        logger.info(f"Database sensor monitoring started with interval {self.db_update_interval}s")
+        # This method is now simplified to only start csv logging.
+        # UI and DB updates are handled by weather/controllers.py
+        self.start_csv_logging()
     
     def stop_monitoring(self):
         """Stop all monitoring threads."""
@@ -361,40 +360,3 @@ class SensorController:
         if self.logging_thread and self.logging_thread.is_alive():
             self.logging_thread.join()  # Wait for the thread to finish
         logger.info("Sensor monitoring stopped")
-    
-    def _ui_monitoring_loop(self):
-        """Background thread for UI sensor readings."""
-        while self.running:
-            try:
-                readings = self.update_readings()
-                if self.socketio:
-                    self.socketio.emit('sensor_update', readings)
-                else:
-                    logger.warning("SocketIO not available for UI updates")
-            except Exception as e:
-                logger.error(f"Error in UI sensor monitoring loop: {e}")
-            time.sleep(self.ui_update_interval)
-    
-    def _db_monitoring_loop(self):
-        """Background thread for updating database with sensor readings."""
-        while self.running:
-            try:
-                now = time.time()
-                if now - self.last_db_update >= self.db_update_interval:
-                    readings = self.update_readings()
-                    with self.app.app_context():
-                        from weather.controllers import update_weather_data
-                        update_data = {
-                            'temperature': readings.get('temperature', 0) if readings.get('temperature') is not None else 0,
-                            'humidity': readings.get('humidity', 0) if readings.get('humidity') is not None else 0,
-                            'soil_moisture': readings.get('soil_moisture', 0) if readings.get('soil_moisture') is not None else 0,
-                            'pressure': readings.get('pressure', 0) if readings.get('pressure') is not None else 0,
-                            'light': readings.get('light', 0) if readings.get('light') is not None else 0,
-                            'rain': readings.get('rain', 0) if readings.get('rain') is not None else 0
-                        }
-                        logger.debug(f"Updating database with sensor readings: {update_data}")
-                        update_weather_data(update_data)
-                    self.last_db_update = now
-            except Exception as e:
-                logger.error(f"Error in database monitoring loop: {e}")
-            time.sleep(1)

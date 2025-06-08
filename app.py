@@ -21,6 +21,7 @@ from weather.routes import weather_bp
 from reports.routes import reports_bp
 import json
 import logging
+from irrigation.controllers import init_scheduler, shutdown_scheduler
 
 # Import all models to ensure they are registered with SQLAlchemy
 from weather.models import WeatherData
@@ -129,6 +130,9 @@ def create_app(config_class=Config):
     with app.app_context():
         db.create_all()
     
+    # Initialize the irrigation scheduler
+    init_scheduler(app)
+    
     @app.route('/')
     def index():
         return render_template('index.html')
@@ -145,6 +149,9 @@ def create_app(config_class=Config):
         
         if hasattr(app, 'network_thread_running'):
             app.network_thread_running = False
+        
+        # Shutdown the irrigation scheduler
+        shutdown_scheduler()
         
         # Use a non-blocking approach for LCD
         try:

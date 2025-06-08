@@ -1,56 +1,53 @@
 from datetime import datetime
 from shared.database import db
+from sqlalchemy.orm import validates
 
 class Preset(db.Model):
-    """Model for irrigation presets with schedules."""
+    """Represents a plant with a specific irrigation schedule."""
     __tablename__ = 'presets'
     
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    active = db.Column(db.Boolean, default=False)
-    duration = db.Column(db.Integer, default=300)  # Duration in seconds
-    water_level = db.Column(db.Integer, default=50)  # Water level threshold in percentage
-    auto_start = db.Column(db.Boolean, default=False)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    description = db.Column(db.String(255), nullable=True)
+    is_active = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    schedules = db.relationship('Schedule', backref='preset', lazy=True, cascade="all, delete-orphan")
-    irrigation_logs = db.relationship('IrrigationLog', backref='preset', lazy=True)
-    
+    schedules = db.relationship('Schedule', backref='preset', lazy='dynamic', cascade="all, delete-orphan")
+
     def to_dict(self, include_schedules=False):
-        result = {
+        """Converts the preset to a dictionary."""
+        data = {
             'id': self.id,
             'name': self.name,
-            'active': self.active,
-            'duration': self.duration,
-            'water_level': self.water_level,
-            'auto_start': self.auto_start,
-            'created_at': self.created_at.isoformat()
+            'description': self.description,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat(),
+            'schedules': []
         }
-        
         if include_schedules:
-            result['schedules'] = [schedule.to_dict() for schedule in self.schedules]
-        else:
-            result['schedules'] = []
-            
-        return result
+            data['schedules'] = [s.to_dict() for s in self.schedules]
+        return data
 
 class Schedule(db.Model):
-    """Model for irrigation schedules."""
+    """Represents a single irrigation event in a preset's schedule."""
     __tablename__ = 'schedules'
     
     id = db.Column(db.Integer, primary_key=True)
-    start_time = db.Column(db.String(8), nullable=False)  # Format: HH:MM:SS
-    duration = db.Column(db.Integer, nullable=False)  # Duration in seconds
-    active = db.Column(db.Boolean, default=True)
     preset_id = db.Column(db.Integer, db.ForeignKey('presets.id'), nullable=False)
-    
+    day_of_week = db.Column(db.String(10), nullable=False)  # e.g., "Monday"
+    start_time = db.Column(db.Time, nullable=False)  # Time of day for irrigation
+    duration_seconds = db.Column(db.Integer, nullable=False) # Duration in seconds
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+
     def to_dict(self):
+        """Converts the schedule to a dictionary."""
         return {
             'id': self.id,
-            'start_time': self.start_time,
-            'duration': self.duration,
-            'active': self.active,
-            'preset_id': self.preset_id
+            'preset_id': self.preset_id,
+            'day_of_week': self.day_of_week,
+            'start_time': self.start_time.strftime('%H:%M'),
+            'duration_seconds': self.duration_seconds,
+            'is_active': self.is_active
         }
 
 class PumpLog(db.Model):
@@ -77,20 +74,19 @@ class IrrigationLog(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     preset_id = db.Column(db.Integer, db.ForeignKey('presets.id'), nullable=True)
-    duration = db.Column(db.Float, nullable=True)  # Duration in seconds
-    water_used = db.Column(db.Float, nullable=True)  # Amount of water used in liters
-    pump_status = db.Column(db.Boolean, nullable=True)  # True if pump was running
-    water_level = db.Column(db.Float, nullable=True)  # Water level percentage
+    duration = db.Column(db.Float, nullable=True)
+    pump_status = db.Column(db.Boolean, nullable=True)
     timestamp = db.Column(db.DateTime, default=datetime.now)
     
+    preset = db.relationship('Preset')
+
     def to_dict(self):
         """Convert the model to a dictionary."""
         return {
             'id': self.id,
             'preset_id': self.preset_id,
+            'preset_name': self.preset.name if self.preset else 'Manual',
             'duration': self.duration,
-            'water_used': self.water_used,
             'pump_status': self.pump_status,
-            'water_level': self.water_level,
             'timestamp': self.timestamp.isoformat() if self.timestamp else None
         }
