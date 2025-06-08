@@ -187,37 +187,8 @@ class SensorController:
     def set_app(self, app):
         """Set the Flask app instance for the sensor controller."""
         self.app = app
-        
         with app.app_context():
-            try:
-                dht_pin = app.config.get('hardware', {}).get('sensors', {}).get('pins', {}).get('dht22', 26)
-                
-                if dht_pin != self.dht_pin and platform.system() == "Linux":
-                    logger.info(f"Updating DHT pin from {self.dht_pin} to {dht_pin}")
-                    self.dht_pin = dht_pin
-                    
-                    try:
-                        import adafruit_dht
-                        import board
-                        pin_map = {
-                            4: board.D4, 17: board.D17, 18: board.D18, 21: board.D21,
-                            22: board.D22, 23: board.D23, 24: board.D24, 25: board.D25,
-                            26: board.D26,
-                        }
-                        pin = pin_map.get(dht_pin, board.D26)
-                        
-                        old_sensor = self.sensors.get('dht')
-                        if old_sensor and hasattr(old_sensor, 'exit'):
-                            old_sensor.exit()
-                            
-                        self.sensors['dht'] = adafruit_dht.DHT22(pin)
-                        logger.info(f"DHT22 sensor reinitialized on pin {dht_pin}")
-                    except Exception as e:
-                        logger.error(f"Failed to reinitialize DHT22 sensor: {e}")
-                        
-                self._initialize_csv_logging(app.config)
-            except Exception as e:
-                logger.warning(f"Could not get DHT pin from config: {e}")
+            self._initialize_csv_logging(app.config)
         logger.info("Flask app instance set for sensor controller")
     
     def _initialize_csv_logging(self, config):
@@ -335,7 +306,7 @@ class SensorController:
                 readings = self.update_readings()
                 self._validate_readings(readings)
                 self._log_data_to_csv(readings)
-                logger.debug(f"Sensor data logged to CSV file.")
+                logger.info(f"Logged to CSV: {readings}")
                 
                 time.sleep(self.log_interval)
             except Exception as e:

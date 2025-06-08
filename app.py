@@ -176,6 +176,10 @@ if __name__ == '__main__':
     # Get configuration values
     config = app.config.get_namespace('')
     
+    # Get logging interval for display
+    logging_config = config.get('logging', {})
+    log_interval = logging_config.get('log_interval', 60)
+    
     # Initial network info fetch
     update_network_info(app)
     
@@ -198,6 +202,7 @@ if __name__ == '__main__':
     print(f"UI update interval: {config.get('UI_UPDATE_INTERVAL', 1)} seconds")
     print(f"Database update interval: {config.get('DB_UPDATE_INTERVAL', 60)} seconds")
     print(f"Network check interval: {config.get('NETWORK_UPDATE_INTERVAL', 60)} seconds")
+    print(f"CSV logging interval: {log_interval} seconds")
     
     # Initialize weather controller with app context - moved here to run after server info is displayed
     from weather.controllers import init_app as init_weather
