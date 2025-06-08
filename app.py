@@ -27,7 +27,7 @@ from weather.models import WeatherData
 from irrigation.models import Preset, PumpLog, IrrigationLog
 
 # Set default configuration values for key operational parameters
-os.environ.setdefault('UI_UPDATE_INTERVAL', '1')  # 1 second default
+os.environ.setdefault('UI_UPDATE_INTERVAL', '2')  # 2 second default
 os.environ.setdefault('DB_UPDATE_INTERVAL', '60')  # 60 seconds default
 os.environ.setdefault('NETWORK_UPDATE_INTERVAL', '60') # 60 seconds default
 
@@ -203,7 +203,7 @@ if __name__ == '__main__':
     print("=" * 60 + "\n")
     
     # Print configuration information
-    print(f"UI update interval: {config.get('UI_UPDATE_INTERVAL', 1)} seconds")
+    print(f"UI update interval: {config.get('UI_UPDATE_INTERVAL', 2)} seconds")
     print(f"Database update interval: {config.get('DB_UPDATE_INTERVAL', 60)} seconds")
     print(f"Network check interval: {config.get('NETWORK_UPDATE_INTERVAL', 60)} seconds")
     print(f"CSV logging interval: {log_interval} seconds")

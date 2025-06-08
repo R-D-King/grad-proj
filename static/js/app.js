@@ -4,11 +4,42 @@
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Application initialized');
     
+    // Connect to Socket.IO
+    const socket = io();
+    
     // Initialize modules
     initializeModules();
     
     // Set up event listeners
     setupEventListeners();
+    
+    // Listen for sensor updates
+    socket.on('sensor_update', function(data) {
+        console.log('Sensor update received:', data);
+        updateElementText('temp', data.temperature);
+        updateElementText('humidity', data.humidity);
+        updateElementText('soil-moisture', data.soil_moisture);
+        updateElementText('pressure', data.pressure);
+        updateElementText('light-percentage', data.light);
+        updateElementText('rain-percentage', data.rain);
+    });
+
+    // Listen for pump status updates
+    socket.on('pump_status_update', function(data) {
+        console.log('Pump status update received:', data);
+        const pumpStatusElement = document.getElementById('pump-status');
+        if (pumpStatusElement) {
+            pumpStatusElement.textContent = data.status;
+            pumpStatusElement.className = data.status === 'Running' ? 'badge bg-success' : 'badge bg-danger';
+        }
+        updateElementText('running-time', data.runtime);
+    });
+
+    // Listen for water level updates
+    socket.on('water_level_update', function(data) {
+        console.log('Water level update received:', data);
+        updateElementText('water-level', `${data.level}%`);
+    });
     
     // Set up clock with reduced frequency (every 10 seconds)
     updateServerTime();
@@ -674,6 +705,8 @@ function displayReport(data, reportType) {
         return;
     }
     
+    currentReportData = data; // Store the data globally for download
+
     if (!data || data.length === 0) {
         reportDisplay.innerHTML = '<div class="alert alert-info">No data available for the selected period.</div>';
         return;
@@ -747,56 +780,50 @@ function displayReport(data, reportType) {
     reportDisplay.innerHTML = tableHTML;
 }
 
-// Function to download a report
+/**
+ * Downloads the currently displayed report data as a CSV file.
+ */
 function downloadReport() {
-    const reportType = document.getElementById('report-type').value;
-    
-    // Set default dates if empty
-    const { startDate, endDate } = setDefaultDates();
-    
-    // Get selected options
-    const options = getReportOptions(reportType);
-    
-    // Create URL with parameters
-    const url = `/api/reports/download?report_type=${reportType}&start_date=${startDate}&end_date=${endDate}&options=${JSON.stringify(options)}`;
-    
-    // First check if data is available
-    fetch(url)
-        .then(response => {
-            // Check if the response is JSON (our no-data message) or a file
-            const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-                // This is our JSON response, likely the no-data message
-                return response.json().then(data => {
-                    if (data.status === 'no_data') {
-                        // Show popup with the message
-                        showAlert(data.message, 'warning');
-                        return null;
-                    }
-                    return data;
-                });
-            } else {
-                // This is a file download, trigger it
-                response.blob().then(blob => {
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    // Include dates in the filename
-                    a.download = `${reportType}_report_${startDate}_to_${endDate}.csv`;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                    
-                    showAlert('Report downloaded successfully', 'success');
-                });
-                return null;
-            }
+    if (!currentReportData || currentReportData.length === 0) {
+        showAlert('No report data to download. Please generate a report first.', 'warning');
+        return;
+    }
+
+    // Use POST to send data to the download endpoint
+    fetch('/api/reports/download', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            data: currentReportData,
+            type: document.getElementById('report-type').value
         })
-        .catch(error => {
-            console.error('Error downloading report:', error);
-            showAlert('Error downloading report. Please try again.', 'danger');
-        });
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Server responded with an error: ${response.status}`);
+        }
+        return response.blob();
+    })
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        const reportType = document.getElementById('report-type').value;
+        const date = new Date().toISOString().slice(0, 10);
+        a.download = `${reportType}_report_${date}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        showAlert('Report downloaded successfully!', 'success');
+    })
+    .catch(error => {
+        console.error('Download error:', error);
+        showAlert(`Failed to download report: ${error.message}`, 'danger');
+    });
 }
 
 // Function to clear the report display
@@ -808,6 +835,8 @@ function clearReports() {
         showAlert('Report display cleared', 'info');
     }
 }
+
+var currentReportData = null;
 
 // Make functions available globally
 window.generateReport = generateReport;

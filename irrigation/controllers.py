@@ -108,17 +108,17 @@ def start_pump():
     with pump_lock:
         # Check if pump is already running
         if pump_running:
-            return {"status": "warning", "message": "Water Pump already running", "runtime": get_pump_duration(), "pump_status": pump.get_status()}
+            return {"status": "warning", "message": "Water Pump already running", "runtime": get_pump_duration(), "pump_status": pump.get_state()}
         
         # Check water level
         water_level = get_water_level()
         if water_level['level'] < 10:  # 10% minimum water level
-            return {"status": "error", "message": "Water level too low", "water_level": water_level, "pump_status": pump.get_status()}
+            return {"status": "error", "message": "Water level too low", "water_level": water_level, "pump_status": pump.get_state()}
         
         # Start the pump
-        success = pump.on()
+        success = pump.turn_on()
         if not success:
-            return {"status": "error", "message": "Failed to start pump", "pump_status": pump.get_status()}
+            return {"status": "error", "message": "Failed to start pump", "pump_status": pump.get_state()}
         
         # Update state
         pump_running = True
@@ -131,7 +131,7 @@ def start_pump():
             "status": "success", 
             "message": "Water Pump started", 
             "runtime": 0,
-            "pump_status": pump.get_status()
+            "pump_status": pump.get_state()
         }
 
 def stop_pump():
@@ -140,13 +140,13 @@ def stop_pump():
     
     with pump_lock:
         if not pump_running:
-            return {"status": "warning", "message": "Water Pump was not running", "runtime": 0, "pump_status": pump.get_status()}
+            return {"status": "warning", "message": "Water Pump was not running", "runtime": 0, "pump_status": pump.get_state()}
         
         # Get the current duration before stopping
         current_duration = get_pump_duration()
         
         # Stop the pump
-        pump.off()
+        pump.turn_off()
         pump_running = False
         pump_start_time = None
         
