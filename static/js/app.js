@@ -3,6 +3,7 @@ let presets = [];
 let activePreset = null;
 let selectedPresetId = null;
 let serverTimeOffset = 0;
+let isServerOnline = false; // Track server connection status
 
 // --- DOMContentLoaded ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -51,25 +52,43 @@ function initializeEventListeners() {
 }
 
 async function initializeClock() {
+    await syncServerTime(); // Perform initial sync
+    setInterval(updateClockDisplay, 1000); // Update display every second
+    setInterval(syncServerTime, 30000); // Resync with server every 30 seconds
+}
+
+function updateClockDisplay() {
+    const timeDisplayEl = document.getElementById('server-time-display');
+    if (isServerOnline) {
+        const now = new Date(new Date().getTime() + serverTimeOffset);
+        timeDisplayEl.textContent = now.toLocaleTimeString();
+    } else {
+        timeDisplayEl.textContent = 'Server Offline';
+        timeDisplayEl.classList.add('text-danger');
+    }
+}
+
+async function syncServerTime() {
     try {
         const response = await fetch('/api/server-time');
+        if (!response.ok) throw new Error('Server not reachable');
+        
         const data = await response.json();
         const serverTime = new Date(data.time);
         const clientTime = new Date();
         serverTimeOffset = serverTime - clientTime;
-
-        setInterval(updateClock, 1000);
-        updateClock(); // Initial display
+        
+        if (!isServerOnline) {
+            isServerOnline = true;
+            document.getElementById('server-time-display').classList.remove('text-danger');
+            console.log('Reconnected to server. Time synchronized.');
+        }
     } catch (error) {
-        console.error('Failed to initialize clock:', error);
-        document.getElementById('server-time-display').textContent = 'Error';
+        if (isServerOnline) {
+            isServerOnline = false;
+            console.error('Lost connection to server:', error.message);
+        }
     }
-}
-
-function updateClock() {
-    const now = new Date(new Date().getTime() + serverTimeOffset);
-    const timeString = now.toLocaleTimeString();
-    document.getElementById('server-time-display').textContent = timeString;
 }
 
 

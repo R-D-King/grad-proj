@@ -242,9 +242,11 @@ def init_scheduler(app):
     logger.info("Irrigation scheduler initialized.")
 
 def shutdown_scheduler():
-    """Stops the scheduler thread."""
-    global scheduler_running
-    if scheduler_thread:
+    """Shuts down the scheduler thread."""
+    global scheduler_thread, scheduler_running
+    if scheduler_thread and scheduler_running:
         scheduler_running = False
-        scheduler_thread.join(timeout=1)
-    logger.info("Irrigation scheduler shut down.")
+        # Do not join the thread, as it causes an assertion error with eventlet.
+        # The daemon thread will exit when the main app exits.
+        scheduler_thread = None
+        logger.info("Irrigation scheduler stopped.")

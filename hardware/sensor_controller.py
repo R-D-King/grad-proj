@@ -339,23 +339,55 @@ class SensorController:
         self.logging_thread.start()
         logger.info(f"CSV logging thread started with interval {self.log_interval}s")
 
+    def _monitoring_loop(self):
+        """Continuously monitors sensors and emits data."""
+        logger.info("Sensor monitoring loop started.")
+        while self.running:
+            try:
+                # Update and broadcast sensor readings
+                readings = self.update_readings()
+                if self.socketio:
+                    self.socketio.emit('sensor_update', readings)
+                
+                # Update and broadcast sensor statuses
+                statuses = self.get_sensor_statuses()
+                if self.socketio:
+                    self.socketio.emit('sensor_status_update', statuses)
+
+                # Use eventlet-friendly sleep
+                if self.socketio:
+                    self.socketio.sleep(self.ui_update_interval)
+                else:
+                    time.sleep(self.ui_update_interval)
+
+            except Exception as e:
+                logger.error(f"Error in sensor monitoring loop: {e}")
+                time.sleep(self.ui_update_interval) # prevent rapid-fire errors
+
     def start_monitoring(self):
-        """Start monitoring sensors at configured intervals."""
-        if self.running: return
-        if not self.app:
-            logger.error("Cannot start monitoring: Flask app not set. Call set_app() first.")
+        """Start the main sensor monitoring loop in a background thread."""
+        if self.running:
+            logger.warning("Monitoring is already running.")
             return
-        if not self.socketio:
-            logger.warning("SocketIO not set. Real-time updates will not be available.")
-        
+            
         self.running = True
         
-        # This method is now simplified to only start csv logging.
-        # UI and DB updates are handled by weather/controllers.py
-        self.start_csv_logging()
-    
+        # Get UI update interval from app config
+        if self.app:
+            with self.app.app_context():
+                self.ui_update_interval = current_app.config.get('UI_UPDATE_INTERVAL', 2)
+        
+        # Use eventlet.spawn if socketio is available for green threads
+        if self.socketio:
+            self.socketio.start_background_task(self._monitoring_loop)
+        else:
+            # Fallback to standard threading if socketio is not used
+            self.monitor_thread = threading.Thread(target=self._monitoring_loop)
+            self.monitor_thread.daemon = True
+            self.monitor_thread.start()
+
     def stop_monitoring(self):
-        """Stop all monitoring threads."""
+        """Stop the monitoring loop."""
         self.running = False
         if self.logging_thread and self.logging_thread.is_alive():
             self.logging_thread.join()  # Wait for the thread to finish
