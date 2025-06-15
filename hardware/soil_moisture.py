@@ -4,7 +4,7 @@ import time
 class SoilMoistureSensor:
     """Soil moisture sensor interface with analog output."""
     
-    def __init__(self, channel=0, dry_value=900, wet_value=400):
+    def __init__(self, channel=0, dry_value=515, wet_value=415):
         """Initialize the soil moisture sensor.
         
         Args:
